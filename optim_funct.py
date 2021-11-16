@@ -2,39 +2,22 @@ import numpy as np
 from math import *
 import csv
 import warnings
-
-try:
-    import biorbd_casadi as biorbd
-except ModuleNotFoundError:
-    import biorbd
-try:
-    from bioptim import (
-        OptimalControlProgram,
-        ObjectiveList,
-        ObjectiveFcn,
-        DynamicsList,
-        DynamicsFcn,
-        BoundsList,
-        ConfigureProblem,
-        QAndQDotBounds,
-        InitialGuess,
-        InterpolationType,
-        Bounds,
-        Node,
-        NonLinearProgram,
-        Dynamics,
-        MovingHorizonEstimator,
-        Solver,
-    )
-    biopti = True
-except ModuleNotFoundError:
-    biopti = False
-    pass
-
-try:
-    from casadi import MX, Function, horzcat
-except ModuleNotFoundError:
-    pass
+from casadi import MX, Function, horzcat
+import biorbd_casadi as biorbd
+from bioptim import (
+    ObjectiveList,
+    ObjectiveFcn,
+    DynamicsList,
+    DynamicsFcn,
+    BoundsList,
+    QAndQDotBounds,
+    InitialGuess,
+    InterpolationType,
+    Bounds,
+    Node,
+    MovingHorizonEstimator,
+    Solver,
+)
 
 
 def states_to_markers(biorbd_model, states):
@@ -53,17 +36,9 @@ def markers_fun(biorbd_model):
     )
 
 
-def EKF(biorbd_model):
-    qMX = MX.sym("qMX", biorbd_model.nbQ())
-    return Function(
-        "markers", [qMX], [horzcat(*[biorbd_model.markers(qMX)[i].to_mx() for i in range(biorbd_model.nbMarkers())])]
-    )
-
-
 # Return muscle force
 def muscles_forces(q, qdot, act, controls, model, nlp, use_excitation=False):
     muscles_states = nlp.model.stateSet()
-    # muscles_states = biorbd.VecBiorbdMuscleState(model.nbMuscles())
     for k in range(model.nbMuscles()):
         if use_excitation is not True:
             muscles_states[k].setActivation(controls[k])
@@ -181,21 +156,6 @@ def compute_err(
     return err
 
 
-# Return estimation on the first node of the ocp and inital guess for next optimisation
-def warm_start_mhe(sol, model, use_excitation=False):
-    # Define problem variable
-    states, controls = sol.states["all"], sol.controls["all"]
-    q, qdot = states[: model.nbQ(), :], states[-model.nbQ() : model.nbQ() * 2, :]
-    u = controls[:, :-1]
-    x = np.vstack([q, qdot]) if use_excitation is not True else np.vstack([q, qdot, states[-model.nbMuscles(), :]])
-    # Prepare data to return
-    x0 = np.hstack((x[:, 1:], x[:, -1:]))  # discard oldest estimate of the window, duplicates youngest
-    u0 = np.hstack((u[:, 1:], u[:, -1:]))
-    x_out = x[:, -1:]
-    u_out = u[:, -1:]
-    return x0, u0, x_out, u_out
-
-
 # Return which iteration has not converged
 def convert_txt_output_to_list(file, nbco, nbmark, nbemg, nbtries):
     conv_list = [[[[[] for i in range(nbtries)] for j in range(nbemg)] for k in range(nbmark)] for l in range(nbco)]
@@ -210,75 +170,7 @@ def convert_txt_output_to_list(file, nbco, nbmark, nbemg, nbtries):
     return conv_list
 
 
-def prepare_ocp(
-    biorbd_model,
-    final_time,
-    x0,
-    nbGT,
-    number_shooting_points,
-    use_SX=False,
-    nb_threads=8,
-    use_torque=False,
-    use_excitation=False,
-):
-    # --- Options --- #
-    # Model path
-    biorbd_model = biorbd_model
-    nbGT = nbGT
-    nbMT = biorbd_model.nbMuscleTotal()
-    tau_min, tau_max, tau_init = -200, 200, 0
-    muscle_min, muscle_max, muscle_init = 0, 1, 0.5
-    activation_min, activation_max, activation_init = 0, 1, 0.2
-
-    # Add objective functions
-    objective_functions = ObjectiveList()
-
-    # Dynamics
-    dynamics = DynamicsList()
-    dynamics.add(
-        DynamicsFcn.MUSCLE_DRIVEN, with_excitations=use_excitation, with_residual_torque=use_torque, expand=False
-    )
-
-    # State path constraint
-    x_bounds = BoundsList()
-    x_bounds.add(bounds=QAndQDotBounds(biorbd_model))
-    if use_excitation is True:
-        x_bounds[0].concatenate(
-            Bounds([activation_min] * biorbd_model.nbMuscles(), [activation_max] * biorbd_model.nbMuscles())
-        )
-
-    # Control path constraint
-    u_bounds = BoundsList()
-    u_bounds.add(
-        [tau_min] * nbGT + [muscle_min] * biorbd_model.nbMuscleTotal(),
-        [tau_max] * nbGT + [muscle_max] * biorbd_model.nbMuscleTotal(),
-    )
-
-    # Initial guesses
-    x_init = InitialGuess(np.tile(x0, (number_shooting_points + 1, 1)).T, interpolation=InterpolationType.EACH_FRAME)
-
-    u0 = np.array([tau_init] * nbGT + [muscle_init] * nbMT)
-    u_init = InitialGuess(np.tile(u0, (number_shooting_points, 1)).T, interpolation=InterpolationType.EACH_FRAME)
-    # ------------- #
-
-    return OptimalControlProgram(
-        biorbd_model,
-        dynamics,
-        number_shooting_points,
-        final_time,
-        x_init,
-        u_init,
-        x_bounds,
-        u_bounds,
-        objective_functions,
-        use_sx=use_SX,
-        n_threads=nb_threads,
-    )
-
-
 # New function for bioptim.mhe
-
-
 def define_objective(
     use_excitation, use_torque, TRACK_EMG, muscles_target, kin_target, biorbd_model, kin_data_to_track="markers"
 ):
@@ -367,127 +259,101 @@ def define_objective(
         )
     return objectives
 
-if biopti:
-    def prepare_mhe(
-        biorbd_model, objectives, window_len, window_duration, x0, use_torque=False, use_excitation=False, nb_threads=4
-    ):
-        # Model path
-        biorbd_model = biorbd_model
-        nbGT = biorbd_model.nbGeneralizedTorque() if use_torque else 0
-        nbGT = nbGT
-        nbMT = biorbd_model.nbMuscleTotal()
-        tau_min, tau_max, tau_init = -10, 10, 0
-        muscle_min, muscle_max, muscle_init = 0, 1, 0.1
-        activation_min, activation_max, activation_init = 0, 1, 0.1
 
-        # Dynamics
-        dynamics = DynamicsList()
-        dynamics.add(
-            DynamicsFcn.MUSCLE_DRIVEN, with_excitations=use_excitation, with_torque=use_torque, expand=False
+def prepare_mhe(
+    biorbd_model, objectives, window_len, window_duration, x0, use_torque=False, use_excitation=False, nb_threads=4
+):
+    # Model path
+    biorbd_model = biorbd_model
+    nbGT = biorbd_model.nbGeneralizedTorque() if use_torque else 0
+    nbGT = nbGT
+    nbMT = biorbd_model.nbMuscleTotal()
+    tau_min, tau_max, tau_init = -10, 10, 0
+    muscle_min, muscle_max, muscle_init = 0, 1, 0.1
+    activation_min, activation_max, activation_init = 0, 1, 0.1
+
+    # Dynamics
+    dynamics = DynamicsList()
+    dynamics.add(
+        DynamicsFcn.MUSCLE_DRIVEN, with_excitations=use_excitation, with_torque=use_torque, expand=False
+    )
+
+    # State path constraint
+    x_bounds = BoundsList()
+    x_bounds.add(bounds=QAndQDotBounds(biorbd_model))
+    if use_excitation is True:
+        x_bounds[0].concatenate(
+            Bounds([activation_min] * biorbd_model.nbMuscles(), [activation_max] * biorbd_model.nbMuscles())
         )
 
-        # State path constraint
-        x_bounds = BoundsList()
-        x_bounds.add(bounds=QAndQDotBounds(biorbd_model))
-        if use_excitation is True:
-            x_bounds[0].concatenate(
-                Bounds([activation_min] * biorbd_model.nbMuscles(), [activation_max] * biorbd_model.nbMuscles())
-            )
+    # Control path constraint
+    u_bounds = BoundsList()
+    u_bounds.add(
+        [tau_min] * nbGT + [muscle_min] * biorbd_model.nbMuscleTotal(),
+        [tau_max] * nbGT + [muscle_max] * biorbd_model.nbMuscleTotal(),
+    )
 
-        # Control path constraint
-        u_bounds = BoundsList()
-        u_bounds.add(
-            [tau_min] * nbGT + [muscle_min] * biorbd_model.nbMuscleTotal(),
-            [tau_max] * nbGT + [muscle_max] * biorbd_model.nbMuscleTotal(),
-        )
+    # Initial guesses
+    x_init = InitialGuess(np.tile(x0, (window_len + 1, 1)).T, interpolation=InterpolationType.EACH_FRAME)
 
-        # Initial guesses
-        x_init = InitialGuess(np.tile(x0, (window_len + 1, 1)).T, interpolation=InterpolationType.EACH_FRAME)
+    u0 = np.array([tau_init] * nbGT + [muscle_init] * nbMT)
+    u_init = InitialGuess(np.tile(u0, (window_len, 1)).T, interpolation=InterpolationType.EACH_FRAME)
 
-        u0 = np.array([tau_init] * nbGT + [muscle_init] * nbMT)
-        u_init = InitialGuess(np.tile(u0, (window_len, 1)).T, interpolation=InterpolationType.EACH_FRAME)
+    mhe = CustomMhe(
+        biorbd_model=biorbd_model,
+        dynamics=dynamics,
+        window_len=window_len,
+        window_duration=window_duration,
+        objective_functions=objectives,
+        x_init=x_init,
+        u_init=u_init,
+        x_bounds=x_bounds,
+        u_bounds=u_bounds,
+        n_threads=nb_threads,
+    )
 
-        mhe = CustomMhe(
-            biorbd_model=biorbd_model,
-            dynamics=dynamics,
-            window_len=window_len,
-            window_duration=window_duration,
-            objective_functions=objectives,
-            x_init=x_init,
-            u_init=u_init,
-            x_bounds=x_bounds,
-            u_bounds=u_bounds,
-            n_threads=nb_threads,
-        )
+    solver = Solver.ACADOS()
+    solver.set_convergence_tolerance(1e-5)
+    solver.set_integrator_type("IRK")
+    solver.set_nlp_solver_type("SQP")
+    solver.set_sim_method_num_steps(1)
+    solver.set_print_level(1)
+    solver.set_maximum_iterations(20)
 
-        solver = Solver.ACADOS()
-        solver.set_convergence_tolerance(1e-5)
-        solver.set_integrator_type("IRK")
-        solver.set_nlp_solver_type("SQP")
-        solver.set_sim_method_num_steps(1)
-        solver.set_print_level(1)
-        solver.set_maximum_iterations(20)
-
-        # ------------- #
-        return mhe, solver
+    # ------------- #
+    return mhe, solver
 
 
-def get_solver_options(solver, print_lvl=0, num_step=1):
-    solver = Solver.ACADOS
+class CustomMhe(MovingHorizonEstimator):
+    def __init__(self, **kwargs):
 
-    mhe_dict = {
-        "solver": solver,
-        "solver_options_first_iter":
-            {
-                "nlp_solver_max_iter": 15,
-                "integrator_type": "IRK",
-                "print_level": print_lvl,
-                "nlp_solver_tol_comp": 1e-8,
-                "nlp_solver_tol_eq": 1e-8,
-                "nlp_solver_tol_stat": 1e-8,
-                "nlp_solver_type": "SQP",
-                "sim_method_num_steps": num_step,
-            },
-        "solver_options":
-            {
-                "nlp_solver_tol_comp": 1e-4,
-                "nlp_solver_tol_eq": 1e-4,
-                "nlp_solver_tol_stat": 1e-4
-            }
-    }
-    return mhe_dict
+        self.init_w_kalman = False
+        self.x_ref = []
+        self.muscles_target = []
+        self.kin_target = []
 
-if biopti:
-    class CustomMhe(MovingHorizonEstimator):
-        def __init__(self, **kwargs):
+        super(CustomMhe, self).__init__(**kwargs)
 
-            self.init_w_kalman = False
-            self.x_ref = []
-            self.muscles_target = []
-            self.kin_target = []
-
-            super(CustomMhe, self).__init__(**kwargs)
-
-        # def advance_window(self, sol, steps: int = 0):
-        #     if self.nlp[0].x_bounds.type != InterpolationType.CONSTANT_WITH_FIRST_AND_LAST_DIFFERENT:
-        #         if self.nlp[0].x_bounds.type == InterpolationType.CONSTANT:
-        #             x_min = np.repeat(self.nlp[0].x_bounds.min[:, :1], 3, axis=1)
-        #             x_max = np.repeat(self.nlp[0].x_bounds.max[:, :1], 3, axis=1)
-        #             self.nlp[0].x_bounds = Bounds(x_min, x_max)
-        #         else:
-        #             raise NotImplementedError(
-        #                 "The MHE is not implemented yet for x_bounds not being "
-        #                 "CONSTANT or CONSTANT_WITH_FIRST_AND_LAST_DIFFERENT"
-        #             )
-        #         self.nlp[0].x_bounds.check_and_adjust_dimensions(self.nlp[0].states.shape, 3)
-        #     self.nlp[0].x_bounds[:, 0] = sol.states["all"][:, 1]
-        #     x = sol.states["all"]
-        #     u = sol.controls["all"][:, :-1]
-        #     if self.init_w_kalman:
-        #         x0 = np.hstack((x[:, 1:], self.x_ref[:, -1:]))
-        #     else:
-        #         x0 = np.hstack((x[:, 1:], x[:, -1:]))  # discard oldest estimate of the window, duplicates youngest
-        #     u0 = np.hstack((u[:, 1:], u[:, -1:]))
-        #     x_init = InitialGuess(x0, interpolation=InterpolationType.EACH_FRAME)
-        #     u_init = InitialGuess(u0, interpolation=InterpolationType.EACH_FRAME)
-        #     self.update_initial_guess(x_init, u_init)
+    # def advance_window(self, sol, steps: int = 0):
+    #     if self.nlp[0].x_bounds.type != InterpolationType.CONSTANT_WITH_FIRST_AND_LAST_DIFFERENT:
+    #         if self.nlp[0].x_bounds.type == InterpolationType.CONSTANT:
+    #             x_min = np.repeat(self.nlp[0].x_bounds.min[:, :1], 3, axis=1)
+    #             x_max = np.repeat(self.nlp[0].x_bounds.max[:, :1], 3, axis=1)
+    #             self.nlp[0].x_bounds = Bounds(x_min, x_max)
+    #         else:
+    #             raise NotImplementedError(
+    #                 "The MHE is not implemented yet for x_bounds not being "
+    #                 "CONSTANT or CONSTANT_WITH_FIRST_AND_LAST_DIFFERENT"
+    #             )
+    #         self.nlp[0].x_bounds.check_and_adjust_dimensions(self.nlp[0].states.shape, 3)
+    #     self.nlp[0].x_bounds[:, 0] = sol.states["all"][:, 1]
+    #     x = sol.states["all"]
+    #     u = sol.controls["all"][:, :-1]
+    #     if self.init_w_kalman:
+    #         x0 = np.hstack((x[:, 1:], self.x_ref[:, -1:]))
+    #     else:
+    #         x0 = np.hstack((x[:, 1:], x[:, -1:]))  # discard oldest estimate of the window, duplicates youngest
+    #     u0 = np.hstack((u[:, 1:], u[:, -1:]))
+    #     x_init = InitialGuess(x0, interpolation=InterpolationType.EACH_FRAME)
+    #     u_init = InitialGuess(u0, interpolation=InterpolationType.EACH_FRAME)
+    #     self.update_initial_guess(x_init, u_init)

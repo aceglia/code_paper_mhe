@@ -1,8 +1,8 @@
 version 4
 
-// File extracted from /home/amedeo/Documents/programmation/OsimToBiomod/Models/Wu_Shoulder_Model_via_points.osim
+// File extracted from /home/amedeo/Documents/programmation/code_paper_mhe/models/Wu_Shoulder_Model_mod_wt_wrapp.osim
 
-gravity	0 0 -9.8000000000000007 
+gravity	0 0 -9.8000000000000007
 
 // SEGMENT DEFINITION
 
@@ -11,8 +11,8 @@ gravity	0 0 -9.8000000000000007
     segment thorax_parent_offset
         parent ground 
         RTinMatrix    0
-        //RT	0.0 0.0 0.0	xyz	0.0 0.0 0.0
-        RT	1.05 1.8 0.5	xyz	0.42 0.03 1.42
+        //RT	1.05 1.8 0.5 xyz 0.42 0.04 1.42
+        RT 2.68 1.43 -0.96 xyz 0.41 -0.02 1.42
     endsegment
 
     // Segments to define transformation axis.
@@ -26,18 +26,25 @@ gravity	0 0 -9.8000000000000007
             0.0    0.0    1.0    0
             0    0    0    1
         //translations xyz
+        ranges		-20.0	20.0
+	-2.0	4.0
+	-5.0	5.0
     endsegment
+
 // Rotation transform was initially an orthogonal basis
     // Segment
     segment thorax_rotation_transform
         parent thorax_translation 
         RTinMatrix    1
         RT
+            1.0    0.0    0.0    0
             0.0    1.0    0.0    0
             0.0    0.0    1.0    0
-            1.0    0.0    0.0    0
             0    0    0    1
         //rotations xyz
+        ranges		-1.5708	1.5708
+	-1.5708	1.5708
+	-1.5708	1.5708
     endsegment
 
     // Segment to cancel transformation bases effect.
@@ -46,9 +53,13 @@ gravity	0 0 -9.8000000000000007
         parent thorax_rotation_transform 
         RTinMatrix    1
         RT
-            0.0    0.0    1.0    0
+            /*0.0    0.0    1.0    0
             1.0    0.0    0.0    0
             0.0    1.0    0.0    0
+            0    0    0    1*/
+            1.0    0.0    0.0    0
+            0.0    1.0    0.0    0
+            0.0    0.0    1.0    0
             0    0    0    1
     endsegment
 
@@ -64,34 +75,24 @@ gravity	0 0 -9.8000000000000007
             0.0    0.7555    0.0
             0.0    0.0    1.4314
         com    0 -0.002 0
-        meshfile Geometry/thorax.vtp
+        meshfile Geometry/thorax_decimate.vtp
     endsegment
 
     // Markers
-    marker    XIPH
-        parent    thorax
-        position    0.084984100000000007 -0.16849500000000001 0
-    endmarker
-
     marker    STER
         parent    thorax
         position    0.02 0 0
     endmarker
 
-    /*marker    C7
+    marker    XIPH
         parent    thorax
-        position    -0.099898899999999999 0.0387645 0
-    endmarker*/
+        position    0.084984100000000007 -0.16849500000000001 0
+    endmarker
 
     marker    T10
         parent    thorax
         position    -0.12478099822998047 -0.13142423785852059 0
     endmarker
-
-    /*marker    RibL
-        parent    thorax
-        position    -0.037349 -0.26577699999999999 -0.138098
-    endmarker*/
 
 // Information about clavicle segment
     // Segment
@@ -117,33 +118,36 @@ gravity	0 0 -9.8000000000000007
         parent clavicle_translation 
         RTinMatrix    1
         RT
-            0.015299995322998767    0.4461252849001196    0.89483972884305    0
-            0.9892986975709203    0.12311735475229534    -0.07829561892774342    0
-            -0.1450999556429883    0.8864617008825506    -0.4394674683532539    0
+            0.015299995    0.193123758    0.981055108    0
+            0.989298698    0.139460526    -0.042881798    0
+            -0.145099956    0.971212631    -0.188923337    0
             0    0    0    1
         //rotations x
+        ranges		-1.570796326795	1.570796326795
     endsegment
     // Segment
     segment clavicle_sternoclavicular_r2
         parent clavicle_sternoclavicular_r1 
         RTinMatrix    1
         RT
-            0.5097800904381478    1.9627784775197663e-05    -0.8603047477537387    0
-            0.7258881871087457    -0.5367351233668947    0.4301182943799332    0
-            -0.46174733264941814    -0.8437507967161126    -0.2736311273084134    0
+            0.643715809    1.9628e-05    -0.765264632    0
+            0.731440585    -0.294030641    0.615256575    0
+            -0.224999174    -0.955795994    -0.189286529    0
             0    0    0    1
         //rotations y
+        ranges		-1.570796326795	1.570796326795
     endsegment
     // Segment
     segment clavicle_sternoclavicular_r3
         parent clavicle_sternoclavicular_r2 
         RTinMatrix    1
         RT
-            -0.49582319489305876    0.12028377319479125    0.8600530061060562    0
-            -0.23586937604185063    -0.9717847666270443    -6.92621768183226e-05    0
-            0.835778078709694    -0.20289450770694878    0.5102046862688416    0
+            -0.344706466    0.544089939    0.76494679    0
+            -0.844781555    -0.535111314    -6.9262e-05    0
+            0.409293997    -0.646236814    0.644093475    0
             0    0    0    1
         rotations z
+        ranges		-6 6
     endsegment
 
     // Segment to cancel transformation bases effect.
@@ -152,9 +156,9 @@ gravity	0 0 -9.8000000000000007
         parent clavicle_sternoclavicular_r3 
         RTinMatrix    1
         RT
-            0.21972987300812946    -0.9614576534140878    0.16528146780358502    0
-            0.9700215708684726    0.23335243848093792    0.06785861408001577    0
-            -0.10381201740497918    0.14541602437997095    0.9839091649618028    0
+            0.831947933    -0.529431911    0.166025567    0
+            0.545055687    0.835796645    -0.066017166    0
+            -0.103812017    0.145416024    0.983909165    0
             0    0    0    1
     endsegment
 
@@ -170,7 +174,7 @@ gravity	0 0 -9.8000000000000007
             0.0    0.0    0.0
             0.0    0.0    0.0
         com    -0.012720499999999999 0.0084954100000000001 0.065984600000000004
-        meshfile Geometry/clavicle.vtp
+        meshfile Geometry/clavicle_decimate.vtp
     endsegment
 
     // Markers
@@ -213,8 +217,10 @@ gravity	0 0 -9.8000000000000007
             0.0    1.0    0.0    0
             1.0    0.0    0.0    0
             0    0    0    1
-        //rotations xy//z
-        rotations xy
+        rotations xy //z
+        ranges		-6 6
+	-6 6
+	-6 6
     endsegment
 
     // Segment to cancel transformation bases effect.
@@ -241,13 +247,13 @@ gravity	0 0 -9.8000000000000007
             0.0    0.0    0.0
             0.0    0.0    0.0
         com    -0.071999999999999995 -0.039 -0.065000000000000002
-        meshfile Geometry/scapula.vtp
+        meshfile Geometry/scapula_decimate.vtp
     endsegment
 
     // Markers
-    marker    SCAP_AA
+    marker    SCAP_IA
         parent    scapula
-        position    -0.061605300000000002 0 -0.012528600000000001
+        position    -0.126717 -0.125 -0.077119599999999996
     endmarker
 
     marker    SCAP_TS
@@ -255,17 +261,10 @@ gravity	0 0 -9.8000000000000007
         position    -0.098463899999999993 -0.012015400000000001 -0.096422900000000006
     endmarker
 
-    marker    SCAP_IA
+    marker    SCAP_AA
         parent    scapula
-        position    -0.126717 -0.125 -0.077119599999999996
+        position    -0.061605300000000002 0 -0.012528600000000001
     endmarker
-
-    /*marker    Acrom
-        parent    scapula
-        position    -0.0117397 0.0154095 -0.001193
-    endmarker*/
-
-
 
 // Information about humerus segment
     // Segment
@@ -291,33 +290,36 @@ gravity	0 0 -9.8000000000000007
         parent humerus_translation 
         RTinMatrix    1
         RT
-            9.999999900000002e-05    -0.9779776357066765    0.20870968846121957    0
-            0.9999999900000002    7.692679374656807e-05    -0.00011866873220807993    0
-            9.999999900000002e-05    0.20870969824099583    0.9779776336195796    0
+            0.0001    -0.54125116    0.84086097    0
+            0.99999999    -2.9961e-05    -0.000138211    0
+            0.0001    0.840860976    0.541251152    0
             0    0    0    1
         rotations x
+        ranges		-6	6
     endsegment
     // Segment
     segment humerus_shoulder_ele
         parent humerus_shoulder_plane 
         RTinMatrix    1
         RT
-            0.8688685699240181    9.999999900000002e-05    -0.4950428246103479    0
-            0.10323704458563057    0.9779768669794532    0.1813928341425795    0
-            0.48415856991631995    -0.20871329055202262    0.849723038126854    0
+            0.824821481    0.0001    -0.565393239    0
+            0.475373596    0.541248063    0.693592444    0
+            0.306087355    -0.840862964    0.446385492    0
             0    0    0    1
         rotations y
+        ranges		-6 6
     endsegment
     // Segment
     segment humerus_shoulder_rotation
         parent humerus_shoulder_ele 
         RTinMatrix    1
         RT
-            0.06698950660724307    0.4905770451032639    0.868819065641557    0
-            0.9908051036755918    -0.13529688292935704    3.948609364061361e-17    0
-            0.11754851141089907    0.8608303644083137    -0.49512971146734036    0
+            0.267087744    0.498424446    0.824764941    0
+            0.881425015    -0.472323981    -0.0    0
+            0.389556261    0.726968451    -0.565475721    0
             0    0    0    1
         rotations z
+        ranges		-6	6
     endsegment
 
     // Segment to cancel transformation bases effect.
@@ -326,9 +328,9 @@ gravity	0 0 -9.8000000000000007
         parent humerus_shoulder_rotation 
         RTinMatrix    1
         RT
-            -0.9908055794729962    0.00019816143126715394    0.13529325340617315    0
-            0.1352932507002256    -2.7059062924248382e-05    0.9908055992891708    0
-            0.00020000036431985522    0.9999999799999273    3.6632123725829086e-10    0
+            -0.881426727    0.000176285    0.472320752    0
+            0.472320743    -9.4465e-05    0.881426745    0
+            0.0002    0.99999998    0.0    0
             0    0    0    1
     endsegment
 
@@ -344,21 +346,10 @@ gravity	0 0 -9.8000000000000007
             0.0    0.004121    0.0
             0.0    0.0    0.013409
         com    0 -0.16450200000000001 0
-        meshfile Geometry/humerus.vtp
+        meshfile Geometry/humerus_decimate.vtp
     endsegment
 
     // Markers
-
-    marker    DELT
-        parent    humerus
-        position    0.0050001067123125733 -0.10453396465085869 0.016080804899861412
-    endmarker
-
-    marker    ARMl
-        parent    humerus
-        position    0.0050071419965700276 -0.13971033083152462 0.016231354856818273
-    endmarker
-
     marker    EPICl
         parent    humerus
         position    -0.0094649399999999998 -0.27348699999999998 0.0307692
@@ -374,15 +365,16 @@ gravity	0 0 -9.8000000000000007
         position    -0.035319999999999997 -0.277505 -0.015446100000000001
     endmarker
 
-    /*marker    elb_in
+
+    marker    DELT
         parent    humerus
-        position    0.046129000000000003 -0.27843400000000001 0.00161575
+        position    0.0050001067123125733 -0.10453396465085869 0.016080804899861412
     endmarker
 
-    marker    GH
+    marker    ARMl
         parent    humerus
-        position    0 0 0
-    endmarker*/
+        position    0.0050071419965700276 -0.13971033083152462 0.016231354856818273
+    endmarker
 
 // Information about ulna segment
     // Segment
@@ -409,8 +401,8 @@ gravity	0 0 -9.8000000000000007
         RTinMatrix    1
         RT
             1.0    0.0    0.0    0
-            0.0    0.9060077018557439    -0.4232612008890886    0
-            0.0    0.4232612008890886    0.9060077018557439    0
+            0.0    0.053550701    -0.998565132    0
+            0.0    0.998565132    0.053550701    0
             0    0    0    1
     endsegment
     // Segment
@@ -418,9 +410,9 @@ gravity	0 0 -9.8000000000000007
         parent ulna_rotation1 
         RTinMatrix    1
         RT
-            0.9298780061936411    0.0    -0.36786803829272663    0
-            0.1557042676564927    0.9060077018557441    0.3935812815818719    0
-            0.33329127595977404    -0.4232612008890886    0.842476635397702    0
+            0.97313437    0.0    -0.230237916    0
+            0.229907555    0.053550701    0.97173805    0
+            0.012329402    -0.998565132    0.052112028    0
             0    0    0    1
     endsegment
     // Segment
@@ -428,11 +420,12 @@ gravity	0 0 -9.8000000000000007
         parent ulna_rotation2 
         RTinMatrix    1
         RT
-            0.8878803769043881    0.20250957196700084    0.41310810881640087    0
-            -0.23837865771776756    0.9704823825677912    0.03660000915599255    0
-            -0.3935022895140467    -0.13097258639610584    0.9099462235538525    0
+            0.443793271    0.851958273    0.277875214    0
+            -0.891133552    0.45226257    0.036600009    0
+            -0.094490878    -0.263866764    0.959919687    0
             0    0    0    1
         rotations z
+        ranges		-6 6
     endsegment
 
     // Segment to cancel transformation bases effect.
@@ -441,9 +434,9 @@ gravity	0 0 -9.8000000000000007
         parent ulna_elbow_flexion 
         RTinMatrix    1
         RT
-            0.9703773499215402    -0.23837865771776753    -0.03928631191553064    0
-            0.23648982544346256    0.9704823825677912    -0.04729172852903494    0
-            0.04940001235799001    0.03660000915599248    0.9981082496947975    0
+            0.453625868    -0.891133552    0.010225717    0
+            0.889822011    0.45226257    -0.060624719    0
+            0.049400012    0.036600009    0.99810825    0
             0    0    0    1
     endsegment
 
@@ -459,7 +452,7 @@ gravity	0 0 -9.8000000000000007
             0.0    0.000618    0.0
             0.0    0.0    0.003213
         com    0 -0.12052499999999999 0
-        meshfile Geometry/ulna.vtp
+        meshfile Geometry/ulna_decimate.vtp
     endsegment
 
     // Markers
@@ -468,10 +461,6 @@ gravity	0 0 -9.8000000000000007
         position    -0.0125907 -0.24309500000000001 0.048703099999999999
     endmarker
 
-    /*marker    Elb
-        parent    ulna
-        position    0 0 0
-    endmarker*/
 
 // Information about radius segment
     // Segment
@@ -498,8 +487,8 @@ gravity	0 0 -9.8000000000000007
         RTinMatrix    1
         RT
             1.0    0.0    0.0    0
-            0.0    0.6483519839836595    -0.7613407284944453    0
-            0.0    0.7613407284944453    0.6483519839836595    0
+            0.0    0.401730568    -0.915757911    0
+            0.0    0.915757911    0.401730568    0
             0    0    0    1
     endsegment
     // Segment
@@ -507,21 +496,23 @@ gravity	0 0 -9.8000000000000007
         parent radius_rotation1 
         RTinMatrix    1
         RT
-            0.9544871698757682    -0.01716099384199165    -0.2977578593973659    0
-            0.2572601473316403    0.5524886499749887    0.7928262787292794    0
-            0.15090215087085085    -0.8333437417651668    0.5317581677072593    0
+            0.146300046    -0.017160994    -0.9890914    0
+            0.947680066    0.289197254    0.1351571    0
+            0.283723087    -0.957115692    0.058572703    0
             0    0    0    1
-        rotations y
+        //rotations y
+        ranges		-1.570796326795	1.570796326795
     endsegment
     // Segment
     segment radius_rotation3
         parent radius_pro_sup 
         RTinMatrix    1
         RT
-            0.7505279641300792    0.5919863910356978    0.2937003368865771    0
-            -0.5855582582921641    0.8017487799801541    -0.1196679570569418    0
-            -0.30631568879932725    -0.08216450954557361    0.9483773996498065    0
+            -0.01347397    0.189305684    0.981825754    0
+            -0.818145885    0.562420564    -0.119667957    0
+            -0.574852818    -0.804889103    0.147301628    0
             0    0    0    1
+        ranges		-1.570796326795	1.570796326795
     endsegment
 
     // Segment to cancel transformation bases effect.
@@ -530,9 +521,9 @@ gravity	0 0 -9.8000000000000007
         parent radius_rotation3 
         RTinMatrix    1
         RT
-            0.8176259778565375    -0.5757497375892936    -6.315462976022699e-17    0
-            0.5757497375892935    0.8176259778565377    6.538021343960292e-17    0
-            1.746538214436716e-17    -3.278285829092527e-17    1.0000000000000002    0
+            0.580650933    -0.814152624    -0.0    0
+            0.814152624    0.580650933    0.0    0
+            -0.0    0.0    1.0    0
             0    0    0    1
     endsegment
 
@@ -548,7 +539,7 @@ gravity	0 0 -9.8000000000000007
             0.0    0.000618    0.0
             0.0    0.0    0.003213
         com    0 -0.12052499999999999 0
-        meshfile Geometry/radius.vtp
+        meshfile Geometry/radius_decimate.vtp
     endsegment
 
     // Markers
@@ -557,10 +548,6 @@ gravity	0 0 -9.8000000000000007
         position    0.0519996 -0.231152 0.020723700000000001
     endmarker
 
-    /*marker    wri_out
-        parent    radius
-        position    0.0219753 -0.22964399999999999 0.050277700000000002
-    endmarker*/
 
 // Information about hand_r segment
     // Segment
@@ -595,7 +582,7 @@ musclegroup thorax_to_scapula
 endmusclegroup
 
     muscle    LVS
-        Type    hillthelen
+        Type    hill
         statetype    buchanan
         musclegroup    thorax_to_scapula
         OriginPosition    -0.037262999999999998 0.094437800000000002 0.022543799999999999
@@ -608,7 +595,7 @@ endmusclegroup
 
 
     muscle    TRP2
-        Type    hillthelen
+        Type    hill
         statetype    buchanan
         musclegroup    thorax_to_scapula
         OriginPosition    -0.077472100000000002 0.031457800000000001 0.0035691299999999998
@@ -621,7 +608,7 @@ endmusclegroup
 
 
     muscle    TRP3
-        Type    hillthelen
+        Type    hill
         statetype    buchanan
         musclegroup    thorax_to_scapula
         OriginPosition    -0.0921656 -0.015404899999999999 0.0025060199999999999
@@ -634,7 +621,7 @@ endmusclegroup
 
 
     muscle    TRP4
-        Type    hillthelen
+        Type    hill
         statetype    buchanan
         musclegroup    thorax_to_scapula
         OriginPosition    -0.115981 -0.10556400000000001 0.00068362499999999999
@@ -647,7 +634,7 @@ endmusclegroup
 
 
     muscle    RMN
-        Type    hillthelen
+        Type    hill
         statetype    buchanan
         musclegroup    thorax_to_scapula
         OriginPosition    -0.063 0.055961700000000003 0.0030000000000000001
@@ -660,7 +647,7 @@ endmusclegroup
 
 
     muscle    RMJ1
-        Type    hillthelen
+        Type    hill
         statetype    buchanan
         musclegroup    thorax_to_scapula
         OriginPosition    -0.079058900000000001 0.0094400400000000002 0.00143378
@@ -673,7 +660,7 @@ endmusclegroup
 
 
     muscle    RMJ2
-        Type    hillthelen
+        Type    hill
         statetype    buchanan
         musclegroup    thorax_to_scapula
         OriginPosition    -0.086999999999999994 -0.025000000000000001 0.00143378
@@ -686,7 +673,7 @@ endmusclegroup
 
 
     muscle    SRA1
-        Type    hillthelen
+        Type    hill
         statetype    buchanan
         musclegroup    thorax_to_scapula
         OriginPosition    -0.001 -0.056166300000000002 0.11981899999999999
@@ -711,7 +698,7 @@ endmusclegroup
         endviapoint
 
     muscle    SRA2
-        Type    hillthelen
+        Type    hill
         statetype    buchanan
         musclegroup    thorax_to_scapula
         OriginPosition    -0.00062592300000000002 -0.102011 0.137825
@@ -736,7 +723,7 @@ endmusclegroup
         endviapoint
 
     muscle    SRA3
-        Type    hillthelen
+        Type    hill
         statetype    buchanan
         musclegroup    thorax_to_scapula
         OriginPosition    -0.011373400000000001 -0.16181699999999999 0.148868
@@ -767,7 +754,7 @@ musclegroup thorax_to_clavicle
 endmusclegroup
 
     muscle    TRP1
-        Type    hillthelen
+        Type    hill
         statetype    buchanan
         musclegroup    thorax_to_clavicle
         OriginPosition    -0.058960100000000001 0.0968498 0.0019247699999999999
@@ -780,7 +767,7 @@ endmusclegroup
 
 
     muscle    SBCL
-        Type    hillthelen
+        Type    hill
         statetype    buchanan
         musclegroup    thorax_to_clavicle
         OriginPosition    -0.000927862 -0.013199000000000001 0.0391262
@@ -799,7 +786,7 @@ musclegroup scapula_to_thorax
 endmusclegroup
 
     muscle    PMN
-        Type    hillthelen
+        Type    hill
         statetype    buchanan
         musclegroup    scapula_to_thorax
         OriginPosition    0.012 -0.041270000000000001 -0.026519999999999998
@@ -818,7 +805,7 @@ musclegroup humerus_to_clavicle
 endmusclegroup
 
     muscle    DELT1
-        Type    hillthelen
+        Type    hill
         statetype    buchanan
         musclegroup    humerus_to_clavicle
         OriginPosition    0.0045591099999999999 -0.103949 0.0077551599999999997
@@ -837,7 +824,7 @@ endmusclegroup
         endviapoint
 
     muscle    PECM1
-        Type    hillthelen
+        Type    hill
         statetype    buchanan
         musclegroup    humerus_to_clavicle
         OriginPosition    0.016 -0.040495700000000003 0.0050000000000000001
@@ -862,7 +849,7 @@ musclegroup humerus_to_scapula
 endmusclegroup
 
     muscle    DELT2
-        Type    hillthelen
+        Type    hill
         statetype    buchanan
         musclegroup    humerus_to_scapula
         OriginPosition    0.0045591099999999999 -0.103949 0.0077551599999999997
@@ -887,7 +874,7 @@ endmusclegroup
         endviapoint
 
     muscle    SUPSP
-        Type    hillthelen
+        Type    hill
         statetype    buchanan
         musclegroup    humerus_to_scapula
         OriginPosition    0.014254899999999999 0.0168443 0.020943799999999999
@@ -912,7 +899,7 @@ endmusclegroup
         endviapoint
 
     muscle    INFSP
-        Type    hillthelen
+        Type    hill
         statetype    buchanan
         musclegroup    humerus_to_scapula
         OriginPosition    -0.0050975700000000001 0.0080408700000000003 0.026396699999999999
@@ -931,7 +918,7 @@ endmusclegroup
         endviapoint
 
     muscle    SUBSC
-        Type    hillthelen
+        Type    hill
         statetype    buchanan
         musclegroup    humerus_to_scapula
         OriginPosition    0.0199995 -0.0083117299999999998 -0.00174873
@@ -942,21 +929,21 @@ endmusclegroup
         pennationAngle    0.34906585039900001
     endmuscle
 
-        viapoint    SUBSC-P2
+        /*viapoint    SUBSC-P2
             parent    humerus
             muscle    SUBSC
             musclegroup    humerus_to_scapula
             position    0.0074314300000000002 0.010374599999999999 -0.022685500000000001
-        endviapoint
-        viapoint    default
+        endviapoint*/
+        /*viapoint    default
             parent    scapula
             muscle    SUBSC
             musclegroup    humerus_to_scapula
             position    -0.039108799999999999 -0.032287999999999997 -0.033371400000000002
-        endviapoint
+        endviapoint*/
 
     muscle    TMIN
-        Type    hillthelen
+        Type    hill
         statetype    buchanan
         musclegroup    humerus_to_scapula
         OriginPosition    0.00655633 -0.00365417 0.021678099999999999
@@ -981,7 +968,7 @@ endmusclegroup
         endviapoint
 
     muscle    TMAJ
-        Type    hillthelen
+        Type    hill
         statetype    buchanan
         musclegroup    humerus_to_scapula
         OriginPosition    0.003699 -0.044999999999999998 -0.0067630399999999997
@@ -1006,7 +993,7 @@ musclegroup scapula_to_humerus
 endmusclegroup
 
     muscle    DELT3
-        Type    hillthelen
+        Type    hill
         statetype    buchanan
         musclegroup    scapula_to_humerus
         OriginPosition    -0.059062499999999997 -0.0015687100000000001 -0.038460599999999998
@@ -1031,7 +1018,7 @@ endmusclegroup
         endviapoint
 
     muscle    CORB
-        Type    hillthelen
+        Type    hill
         statetype    buchanan
         musclegroup    scapula_to_humerus
         OriginPosition    0.012500000000000001 -0.041270000000000001 -0.026519999999999998
@@ -1050,7 +1037,7 @@ musclegroup scapula_to_radius
 endmusclegroup
 
     muscle    bic_l
-        Type    hillthelen
+        Type    hill
         statetype    buchanan
         musclegroup    scapula_to_radius
         OriginPosition    -0.035394200000000001 -0.0266676 -0.0147901
@@ -1111,7 +1098,7 @@ endmusclegroup
         endviapoint
 
     muscle    bic_s
-        Type    hillthelen
+        Type    hill
         statetype    buchanan
         musclegroup    scapula_to_radius
         OriginPosition    0.0143708 -0.0445517 -0.0297503
@@ -1154,7 +1141,7 @@ musclegroup humerus_to_thorax
 endmusclegroup
 
     muscle    PECM2
-        Type    hillthelen
+        Type    hill
         statetype    buchanan
         musclegroup    humerus_to_thorax
         OriginPosition    0.016 -0.035495699999999998 0.0050000000000000001
@@ -1173,7 +1160,7 @@ endmusclegroup
         endviapoint
 
     muscle    PECM3
-        Type    hillthelen
+        Type    hill
         statetype    buchanan
         musclegroup    humerus_to_thorax
         OriginPosition    0.016 -0.029999999999999999 0.0050000000000000001
@@ -1192,7 +1179,7 @@ endmusclegroup
         endviapoint
 
     muscle    LAT
-        Type    hillthelen
+        Type    hill
         statetype    buchanan
         musclegroup    humerus_to_thorax
         OriginPosition    0.0099175200000000008 -0.022333700000000001 -0.008822
@@ -1235,7 +1222,7 @@ musclegroup scapula_to_ulna
 endmusclegroup
 
     muscle    tric_long
-        Type    hillthelen
+        Type    hill
         statetype    buchanan
         musclegroup    scapula_to_ulna
         OriginPosition    -0.044392899999999999 -0.056349799999999999 -0.013452799999999999
@@ -1266,7 +1253,7 @@ musclegroup humerus_to_ulna
 endmusclegroup
 
     muscle    tric_lat
-        Type    hillthelen
+        Type    hill
         statetype    buchanan
         musclegroup    humerus_to_ulna
         OriginPosition    -0.0065191900000000002 -0.137632 0.00465811
@@ -1285,7 +1272,7 @@ endmusclegroup
         endviapoint
 
     muscle    tric_med
-        Type    hillthelen
+        Type    hill
         statetype    buchanan
         musclegroup    humerus_to_ulna
         OriginPosition    -0.0091203099999999995 -0.14904800000000001 -0.0098603800000000002

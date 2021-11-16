@@ -1,5 +1,3 @@
-# import biorbd
-# from updated.ConvertOsim2Biorbd import ConvertedFromOsim2Biorbd4
 import numpy as np
 import csv
 import scipy.io as sio

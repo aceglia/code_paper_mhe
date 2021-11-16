@@ -1,11 +1,10 @@
 import biorbd
 import bioviz
-from client import Client
+from biosiglive.client import Client
 import numpy as np
-from server import Server
+from biosiglive.server import Server
 from time import sleep
-from MVC_pytrigno import ComputeMvc
-from Modelizer import *
+from biosiglive.live_mvc import ComputeMvc
 from pyomeca import Markers, Analogs
 
 
@@ -154,8 +153,8 @@ def EKF(model, animate=True, return_markers_info=False):
     if animate is True:
         b = bioviz.Viz(loaded_model=bmodel)
         # for i in range(q_recons.shape[1]):
-            # b.load_c3d(data_path)
-        b.load_experimental_markers(markers)
+        b.load_c3d(data_path)
+        # b.load_experimental_markers(markers)
         # b.load_experimental_markers(Markers(markers))
         # b.load_movement(q_recons[:bmodel.nbQ(), i:i+1])
         # import time
