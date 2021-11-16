@@ -1,6 +1,7 @@
 from biosiglive.client import Client
 from biosiglive.data_plot import init_plot_force, init_plot_q
 import multiprocessing as mp
+import scipy.io as sio
 from mhe.ocp import (
     prepare_mhe,
     get_reference_data,
@@ -49,6 +50,7 @@ class MuscleForceEstimator:
         self.plot_q_freq, self.plot_force_freq = self.exp_freq, 10
         self.force_to_plot, self.q_to_plot = [], []
         self.count_p_f, self.count_p_q = [], []
+        self.mvc_list = []
 
         for key in conf.keys():
             self.__dict__[key] = conf[key]
@@ -67,11 +69,28 @@ class MuscleForceEstimator:
         #     self.data_to_get.append("q")
         # if self.track_emg:
         self.data_to_get.append("emg")
-        self.x_ref, self.markers_target, self.muscles_target = get_reference_data(offline_path)
+        if self.test_offline:
+            self.x_ref, self.markers_target, self.muscles_target = get_reference_data(offline_path)
+        else:
+            nb_of_data = self.ns_mhe + 1  # if t == 0 else 2
+            vicon_client = Client(self.server_ip, self.server_port, type="TCP")
+            data = vicon_client.get_data(
+                self.data_to_get,
+                read_frequency=self.markers_rate,
+                nb_of_data_to_export=nb_of_data,
+                nb_frame_of_interest=self.ns_mhe,
+                get_names=self.get_names,
+                get_kalman=self.get_kalman,
+                norm_emg=True,
+                mvc_list=self.mvc_list
+            )
+            self.x_ref = np.array(data["kalman"])
+            self.markers_ref = np.array(data["markers"])
+            self.muscles_ref = np.array(data["emg"])
         # self.muscles_target = np.zeros((self.nbMT, self.ns_mhe))
         # self.markers_target = np.zeros((3, biorbd_model.nbMarkers(), self.ns_mhe + 1))
-        # self.x_ref = np.zeros((self.nbQ * 2, self.ns_mhe + 1))
-        X_est = np.ndarray((self.nbQ * 2 + self.nbMT, 1)) if self.use_excitation else np.ndarray((self.nbQ * 2, 1))
+        # self.x_ref = np.zeros((self.nbQ, self.ns_mhe + 1))
+        # X_est = np.ndarray((self.nbQ * 2 + self.nbMT, 1)) if self.use_excitation else np.ndarray((self.nbQ * 2, 1))
         self.kin_target = self.markers_target if self.kin_data_to_track == "markers" else self.x_ref[: self.nbQ, :]
         self.markers_ratio = int(self.markers_rate / self.exp_freq)
         self.EMG_ratio = int(self.emg_rate * self.markers_ratio / self.markers_rate)
@@ -88,11 +107,10 @@ class MuscleForceEstimator:
 
         # multiprocess stuffs
         manager = mp.Manager()
-        self.data_count = mp.Value('i', 0)
         self.plot_queue = manager.Queue()
         self.data_queue = manager.Queue()
-        self.data_event = mp.Event()
         self.process = mp.Process
+        self.plot_event = mp.Event()
 
         if self.track_emg:
             weight = {
@@ -119,7 +137,7 @@ class MuscleForceEstimator:
             use_torque=self.use_torque,
             track_emg=self.track_emg,
             muscles_target=self.muscles_target[:, :self.ns_mhe],
-            kin_target=self.kin_target[:, :self.ns_mhe +1],
+            kin_target=self.kin_target[:, :self.ns_mhe + 1],
             biorbd_model=biorbd_model,
             kin_data_to_track=self.kin_data_to_track,
         )
@@ -142,6 +160,7 @@ class MuscleForceEstimator:
 
     # @staticmethod
     def get_data(self, t):
+        self.plot_event.wait()
         data_to_get = self.data_to_get
         stream_frequency = 2 * self.exp_freq
         while True:
@@ -160,6 +179,8 @@ class MuscleForceEstimator:
                 nb_frame_of_interest=self.ns_mhe,
                 get_names=self.get_names,
                 get_kalman=self.get_kalman,
+                norm_emg=True,
+                mvc_list=self.mvc_list
             )
             self.data_queue.put_nowait(data)
             toc = time() - tic
@@ -183,30 +204,29 @@ class MuscleForceEstimator:
         self.offline_file = offline_file
         proc_plot, proc_get_data = [], []
         if test_offline is not True:
-            proc_get_data = self.process(name="data", target=MuscleForceEstimator.get_data, args=(self, t))
+            proc_get_data = self.process(name="data", target=MuscleForceEstimator.get_data, args=(self,))
             proc_get_data.start()
-        #
-        # if self.data_to_show:
-        #     proc_plot = self.process(name="plot", target=MuscleForceEstimator.run_plot, args=(self,))
-        #     proc_plot.start()
 
         proc_mhe = self.process(name="mhe", target=MuscleForceEstimator.run_mhe, args=(self, var, server_ip, server_port, data_to_show))
         proc_mhe.start()
-        # MuscleForceEstimator.run_mhe(self, var, server_ip, server_port, data_to_show)
 
-        # if self.data_to_show:
-        #     proc_plot.join()
-        #
+        if self.data_to_show is not None:
+            proc_plot = self.process(name="plot", target=MuscleForceEstimator.run_plot, args=(self,))
+            proc_plot.start()
+
         proc_mhe.join()
         if test_offline is not True:
             proc_get_data.join()
 
-    def run_plot(self):
-        for data_to_show in self.data_to_show:
-            if data_to_show == "force":
-                self.p_force, self.win_force, self.app_force = init_plot_force(self.nbMT)
+        if self.data_to_show is not None:
+            proc_plot.join()
 
-            elif data_to_show == "q":
+    def run_plot(self):
+        for data in self.data_to_show:
+            if data == "force":
+                print("should plot")
+                self.p_force, self.win_force, self.app_force = init_plot_force(self.nbMT, plot_type='progress_bar')
+            elif data == "q":
                 # self.p_q, self.win_q, self.app_q, self.box_q = init_plot_q(self.nbQ, self.dof_names)
                 import bioviz
                 self.b = bioviz.Viz(model_path=self.model_path,
@@ -223,7 +243,7 @@ class MuscleForceEstimator:
         self.plot_force_ratio = int(self.exp_freq / self.plot_force_freq)
         self.force_to_plot = np.zeros((self.nbMT, self.plot_force_ratio))
         self.count_p_f, self.count_p_q = self.plot_force_ratio, self.plot_q_ratio
-
+        self.plot_event.set()
         while True:
             try:
                 data = self.plot_queue.get_nowait()
@@ -231,9 +251,11 @@ class MuscleForceEstimator:
             except:
                 is_working = False
             if is_working:
+                from mhe.utils import update_plot
                 update_plot(self, data["t"], data["force_est"], data["q_est"])
 
     def run_mhe(self, var, server_ip, server_port, data_to_show):
+        self.plot_event.wait()
         self.data_to_show = data_to_show
         for key in var.keys():
             if key in self.__dict__:
@@ -259,30 +281,30 @@ class MuscleForceEstimator:
                                            solver=self.solver
         )
         # final_sol.graphs()
-        # final_sol.animate()
-        from bioptim import Shooting
-        from bioptim import Solution
-        ns = 149
-        final_time = ns/self.exp_freq
-        short_ocp = prepare_short_ocp(self.model_path, final_time=final_time, n_shooting=ns)
-        x_init_guess = InitialGuess(final_sol.states["all"], interpolation=InterpolationType.EACH_FRAME)
-        u_init_guess = InitialGuess(final_sol.controls["all"], interpolation=InterpolationType.EACH_FRAME)
-        sol = Solution(short_ocp, [x_init_guess, u_init_guess])
-        sol_int = sol.integrate(shooting_type=Shooting.SINGLE_CONTINUOUS, use_scipy_integrator=True)
-        print(sol_int.states['q'][0, :])
-        import matplotlib.pyplot as plt
-        for i in range(sol_int.states['q'].shape[0]):
-            plt.subplot(5, 5, i + 1)
-            plt.plot(sol_int.states['q'][i, :])
-            plt.plot(final_sol.states['q'][i, :])
-        plt.show()
+        final_sol.animate()
+        # from bioptim import Shooting
+        # from bioptim import Solution
+        # ns = 149
+        # final_time = ns/self.exp_freq
+        # short_ocp = prepare_short_ocp(self.model_path, final_time=final_time, n_shooting=ns)
+        # x_init_guess = InitialGuess(final_sol.states["all"], interpolation=InterpolationType.EACH_FRAME)
+        # u_init_guess = InitialGuess(final_sol.controls["all"], interpolation=InterpolationType.EACH_FRAME)
+        # sol = Solution(short_ocp, [x_init_guess, u_init_guess])
+        # sol_int = sol.integrate(shooting_type=Shooting.SINGLE_CONTINUOUS, use_scipy_integrator=True)
+        # print(sol_int.states['q'][0, :])
+        # import matplotlib.pyplot as plt
+        # for i in range(sol_int.states['q'].shape[0]):
+        #     plt.subplot(5, 5, i + 1)
+        #     plt.plot(sol_int.states['q'][i, :])
+        #     plt.plot(final_sol.states['q'][i, :])
+        # plt.show()
         return final_sol
 
 
 if __name__ == "__main__":
     # sleep(5)
+    mvc_list = sio.loadmat("MVC_18_11_2021/MVC.mat")["MVC_list_max"]
     configuration_dic = {
-        # "model_path": "arm26_6mark_scaled.bioMod",
         "model_path": "models/wu_model.bioMod",
         "ns_mhe": 7,
         "exp_freq": 30,
@@ -292,21 +314,23 @@ if __name__ == "__main__":
         "track_emg": True,
         "init_w_kalman": True,
         "kin_data_to_track": "q",
+        "mvc_list": mvc_list
     }
-    # if conf["kin_data_to_track"] == 'markers':
-    #     conf["exp_freq"] = 60
-    # else:
-    #     conf["exp_freq"] = 80
+    if configuration_dic["kin_data_to_track"] == 'markers':
+        configuration_dic["exp_freq"] = 30
+    else:
+        configuration_dic["exp_freq"] = 30
+
 
     variables_dic = {
         "plot_force_freq": 10,
         "emg_rate": 2000,
         "markers_rate": 100,
         "plot_q_freq": 20,
-        "print_lvl": 1,
+        "print_lvl": 0,
     }
-    # data_to_show = ["force"]
-    data_to_show = None
+    data_to_show = ["force"]
+    # data_to_show = None
     server_ip = "127.0.0.1"
     server_port = 50001
     offline_path = "data/data_09_2021/test_abd.mat"
@@ -317,6 +341,7 @@ if __name__ == "__main__":
             data_to_show,
             test_offline=True,
             offline_file=offline_path
+
             )
     # print(sol.controls)
     # sol.animate(mesh=True)
