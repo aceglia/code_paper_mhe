@@ -69,7 +69,7 @@ class MuscleForceEstimator:
         #     self.data_to_get.append("q")
         # if self.track_emg:
         self.data_to_get.append("emg")
-        if self.test_offline:
+        if offline_path:
             self.x_ref, self.markers_target, self.muscles_target = get_reference_data(offline_path)
         else:
             nb_of_data = self.ns_mhe + 1  # if t == 0 else 2
@@ -329,10 +329,10 @@ if __name__ == "__main__":
         "plot_q_freq": 20,
         "print_lvl": 0,
     }
-    data_to_show = ["force"]
+    data_to_show = ["q"]
     # data_to_show = None
     server_ip = "127.0.0.1"
-    server_port = 50001
+    server_port = 50000
     offline_path = "data/data_09_2021/test_abd.mat"
     MHE = MuscleForceEstimator(configuration_dic)
     MHE.run(variables_dic,
