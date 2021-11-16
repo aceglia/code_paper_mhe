@@ -1,21 +1,24 @@
 from biosiglive.client import Client
-from biosiglive.data_plot import init_plot_force, init_plot_q
+# from biosiglive.data_plot import init_plot_force, init_plot_q
 import multiprocessing as mp
-import scipy.io as sio
-from mhe.ocp import (
-    prepare_mhe,
-    get_reference_data,
-    force_func,
-    define_objective,
-    update_mhe,
-    prepare_short_ocp
-)
-from bioptim import InitialGuess, InterpolationType
-import numpy as np
-from mhe.utils import check_and_adjust_dim, update_plot
+# import scipy.io as sio
+# from mhe.ocp import (
+#     prepare_mhe,
+#     get_reference_data,
+#     force_func,
+#     define_objective,
+#     update_mhe,
+#     prepare_short_ocp
+# )
+# from bioptim import InitialGuess, InterpolationType
+# import numpy as np
+# from mhe.utils import check_and_adjust_dim, update_plot
 import biorbd_casadi as biorbd
-from time import strftime, time, sleep
-import bioviz
+# from time import strftime, time, sleep
+# import bioviz
+from biosiglive.data_plot import init_plot_force, init_plot_q, update_plot_force, update_plot_q
+from mhe.ocp import *
+from mhe.utils import *
 
 # TODO add class for configurate problem instead of dic
 # class ConfPlot:
@@ -107,8 +110,10 @@ class MuscleForceEstimator:
 
         # multiprocess stuffs
         manager = mp.Manager()
+        self.data_count = mp.Value('i', 0)
         self.plot_queue = manager.Queue()
         self.data_queue = manager.Queue()
+        self.data_event = mp.Event()
         self.process = mp.Process
         self.plot_event = mp.Event()
 
@@ -137,7 +142,7 @@ class MuscleForceEstimator:
             use_torque=self.use_torque,
             track_emg=self.track_emg,
             muscles_target=self.muscles_target[:, :self.ns_mhe],
-            kin_target=self.kin_target[:, :self.ns_mhe + 1],
+            kin_target=self.kin_target[:, :self.ns_mhe +1],
             biorbd_model=biorbd_model,
             kin_data_to_track=self.kin_data_to_track,
         )
@@ -160,11 +165,11 @@ class MuscleForceEstimator:
 
     # @staticmethod
     def get_data(self, t):
-        self.plot_event.wait()
+        # self.plot_event.wait()
         data_to_get = self.data_to_get
-        stream_frequency = 2 * self.exp_freq
+        # stream_frequency = 2 * self.exp_freq
         while True:
-            tic = time()
+            # tic = time()
             try:
                 self.data_queue.get_nowait()
             except:
@@ -174,7 +179,7 @@ class MuscleForceEstimator:
             vicon_client = Client(self.server_ip, self.server_port, type="TCP")
             data = vicon_client.get_data(
                 data_to_get,
-                read_frequency=stream_frequency,
+                read_frequency=self.exp_freq,
                 nb_of_data_to_export=nb_of_data,
                 nb_frame_of_interest=self.ns_mhe,
                 get_names=self.get_names,
@@ -183,11 +188,11 @@ class MuscleForceEstimator:
                 mvc_list=self.mvc_list
             )
             self.data_queue.put_nowait(data)
-            toc = time() - tic
-            if 1/stream_frequency - 1/toc > 0:
-                sleep(1/stream_frequency - 1/toc)
-            else:
-                print("Take too much time to get data")
+            # toc = time() - tic
+            # if 1/stream_frequency - 1/toc > 0:
+            #     sleep(1/stream_frequency - 1/toc)
+            # else:
+            #     print("Take too much time to get data")
         # self.data_count.value += 1
         #     if self.data_event.is_set() is not True:
         #         print(self.data_event.is_set())
@@ -203,35 +208,45 @@ class MuscleForceEstimator:
         self.test_offline = test_offline
         self.offline_file = offline_file
         proc_plot, proc_get_data = [], []
+        t = 0
         if test_offline is not True:
-            proc_get_data = self.process(name="data", target=MuscleForceEstimator.get_data, args=(self,))
+            proc_get_data = self.process(name="data", target=MuscleForceEstimator.get_data, args=(self, t))
             proc_get_data.start()
+
+        if self.data_to_show:
+            proc_plot = self.process(name="plot", target=MuscleForceEstimator.run_plot, args=(self,))
+            proc_plot.start()
 
         proc_mhe = self.process(name="mhe", target=MuscleForceEstimator.run_mhe, args=(self, var, server_ip, server_port, data_to_show))
         proc_mhe.start()
+        # MuscleForceEstimator.run_mhe(self, var, server_ip, server_port, data_to_show)
 
-        if self.data_to_show is not None:
-            proc_plot = self.process(name="plot", target=MuscleForceEstimator.run_plot, args=(self,))
-            proc_plot.start()
+        if self.data_to_show:
+            proc_plot.join()
 
         proc_mhe.join()
         if test_offline is not True:
             proc_get_data.join()
 
-        if self.data_to_show is not None:
-            proc_plot.join()
-
     def run_plot(self):
-        for data in self.data_to_show:
-            if data == "force":
-                print("should plot")
-                self.p_force, self.win_force, self.app_force = init_plot_force(self.nbMT, plot_type='progress_bar')
-            elif data == "q":
+        # print(1)
+        # print(self.plot_queue)
+        # self.data_to_show = data_to_show
+        # initialize plot
+        # if data_to_show:
+        for data_to_show in self.data_to_show:
+            if data_to_show == "force":
+                # p_force, win_force, app_force, box_force = init_plot_force(self.nbMT)
+                self.p_force, self.win_force, self.app_force = init_plot_force(self.nbMT)
+
+            elif data_to_show == "q":
                 # self.p_q, self.win_q, self.app_q, self.box_q = init_plot_q(self.nbQ, self.dof_names)
                 import bioviz
                 self.b = bioviz.Viz(model_path=self.model_path,
                                     show_global_center_of_mass=False,
                                     show_markers=True,
+                                    show_floor=False,
+                                    show_gravity_vector=False,
                                     show_muscles=False,
                                     show_segments_center_of_mass=False,
                                     show_local_ref_frame=False,
@@ -251,7 +266,7 @@ class MuscleForceEstimator:
             except:
                 is_working = False
             if is_working:
-                from mhe.utils import update_plot
+                # from mhe.utils import update_plot
                 update_plot(self, data["t"], data["force_est"], data["q_est"])
 
     def run_mhe(self, var, server_ip, server_port, data_to_show):
@@ -281,7 +296,6 @@ class MuscleForceEstimator:
                                            solver=self.solver
         )
         # final_sol.graphs()
-        final_sol.animate()
         # from bioptim import Shooting
         # from bioptim import Solution
         # ns = 149
@@ -307,7 +321,7 @@ if __name__ == "__main__":
     configuration_dic = {
         "model_path": "models/wu_model.bioMod",
         "ns_mhe": 7,
-        "exp_freq": 30,
+        # "exp_freq": 30,
         "use_torque": True,
         "use_excitation": False,
         "save_results": True,
@@ -329,7 +343,7 @@ if __name__ == "__main__":
         "plot_q_freq": 20,
         "print_lvl": 0,
     }
-    data_to_show = ["q"]
+    data_to_show = ["force", "q"]
     # data_to_show = None
     server_ip = "127.0.0.1"
     server_port = 50000
