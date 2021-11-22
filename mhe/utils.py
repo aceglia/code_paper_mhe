@@ -39,7 +39,7 @@ def update_plot(estimator_instance, t, force_est, q_est):
         # )
         # estimator_instance.count_p_q = 0
         # estimator_instance.b.load_experimental_markers(estimator_instance.kin_target[:, :, -1:])
-        estimator_instance.wind.set_q(q_est)
+        estimator_instance.b.set_q(q_est[:, -1])
         # estimator_instance.b.update()
         # else:
         #     estimator_instance.count_p_q += 1

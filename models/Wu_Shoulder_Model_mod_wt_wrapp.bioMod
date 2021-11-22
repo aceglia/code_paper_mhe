@@ -87,7 +87,7 @@ gravity	0 -9.8000000000000007 0
 
     marker    T10
         parent    thorax
-        position    -0.12478099822998047 -0.13142423785852059 0
+        position    -0.12478099822998047 -0.19587285238046348 0
     endmarker
 
 // Information about clavicle segment
@@ -249,19 +249,19 @@ gravity	0 -9.8000000000000007 0
         position    -0.126717 -0.125 -0.077119599999999996
     endmarker
 
-    marker    SCAP_TS
+    /*marker    SCAP_TS
         parent    scapula
         position    -0.098463899999999993 -0.012015400000000001 -0.096422900000000006
-    endmarker
+    endmarker*/
 
     marker    Acrom
         parent    scapula
-        position    -0.0117397 0.0154095 -0.001193
+        position    -0.033537382159644136 0.015428879737854003 0.0038009854182036802
     endmarker
 
     marker    SCAP_AA
         parent    scapula
-        position    -0.061605300000000002 0 -0.012528600000000001
+        position    -0.098463899999999993 -0.012015400000000001 -0.096422900000000006
     endmarker
 
 // Information about humerus segment
@@ -358,10 +358,10 @@ gravity	0 -9.8000000000000007 0
         position    0.011883899999999999 -0.28972100000000001 -0.049107999999999999
     endmarker
 
-    marker    LARM_elb
+    /*marker    LARM_elb
         parent    humerus
         position    -0.035319999999999997 -0.277505 -0.015446100000000001
-    endmarker
+    endmarker*/
 
     marker    DELT
         parent    humerus
@@ -456,6 +456,11 @@ gravity	0 -9.8000000000000007 0
     marker    STYLu
         parent    ulna
         position    -0.0125907 -0.24309500000000001 0.048703099999999999
+    endmarker
+
+    marker    LARM_elb
+        parent    ulna
+        position    -0.039377712334517187 0.0079292330772932091 0.0021122728723463524
     endmarker
 
 
