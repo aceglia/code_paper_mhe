@@ -60,10 +60,10 @@ def get_reference_data(file_path):
 
 # New function for bioptim.mhe
 def define_objective(
-    weights, use_excitation, use_torque, track_emg, muscles_target, kin_target, biorbd_model, kin_data_to_track="markers"
+    weights, use_excitation, use_torque, track_emg, muscles_target, kin_target, biorbd_model, kin_data_to_track="markers",
+        muscle_track_idx=()
 ):
     # muscle_track_idx = range(0, 34)
-    muscle_track_idx = [0, 1, 2, 3, 4, 11, 12, 13, 17, 18, 19, 20, 21, 24, 25, 26]
     muscle_min_idx = []
     muscle_target_reduce = np.zeros((len(muscle_track_idx), muscles_target.shape[1]))
     count = 0
@@ -198,7 +198,7 @@ def prepare_mhe(
     # )
 
     solver = Solver.ACADOS()
-    solver.set_convergence_tolerance(1e-5)
+    solver.set_convergence_tolerance(1e-3)
     solver.set_integrator_type("IRK")
     solver.set_qp_solver("PARTIAL_CONDENSING_HPIPM")
     # solver.set_qp_solver("FULL_CONDENSING_QPOASES")
@@ -206,16 +206,17 @@ def prepare_mhe(
     # solver.set_nlp_solver_type("SQP")
     solver.set_sim_method_num_steps(1)
     solver.set_print_level(0)
-    solver.set_maximum_iterations(15)
+    solver.set_maximum_iterations(10)
     # solver = Solver.IPOPT()
     # ------------- #
     return mhe, solver
 
 
-def get_target(mhe, t, x_ref, markers_ref, muscles_ref, ns_mhe, rt_ratio, track_emg, kin_data_to_track, model, muscle_track_idx, offline):
+def get_target(mhe, t, x_ref, markers_ref, muscles_ref, ns_mhe, markers_ratio, emg_ratio, slide_size, track_emg, kin_data_to_track, model, muscle_track_idx, offline):
     nbMT, nbQ = model.nbMuscles(), model.nbQ(),
     muscles_ref = muscles_ref if track_emg is True else np.zeros((nbMT, ns_mhe))
     q_target_idx, markers_target_idx, muscles_target_idx = [], [], []
+    offline_emg_ratio = emg_ratio
 
     # Find objective function idx for targets
     for i in range(len(mhe.nlp[0].J)):
@@ -235,23 +236,27 @@ def get_target(mhe, t, x_ref, markers_ref, muscles_ref, ns_mhe, rt_ratio, track_
         if i in muscle_track_idx:
             muscle_target_reduce[count, :] = muscles_ref[i, :]
             count += 1
-    muscle_target = muscle_target_reduce[:, ::rt_ratio][:, t: (ns_mhe + 1 + t)] if offline else muscle_target_reduce
+    muscle_target = muscle_target_reduce[:, ::offline_emg_ratio][:, slide_size*t: (ns_mhe + 1 + slide_size*t)] if offline else muscle_target_reduce
 
     # Markers target:
-    markers_target = markers_ref[:3, :, ::rt_ratio][:3, :, t: (ns_mhe + 1 + t)] if offline else markers_ref
+    markers_target = markers_ref[:3, :, ::markers_ratio][:3, :, slide_size*t: (ns_mhe + 1 + slide_size*t)] if offline else markers_ref
     for i in range(markers_target.shape[2]):
         for j in range(markers_target.shape[1]):
             if np.product(markers_target[:3, j, i]) == 0:
                 markers_target[:3, j, i] = markers_ref[:3, j, i - 1]
 
     # Angle target:
-    q_target = x_ref[:, ::rt_ratio][:, t: (ns_mhe + 1 + t)] if offline else x_ref[:, :]
+    q_target = x_ref[:, ::markers_ratio][:, slide_size*t: (ns_mhe + 1 + slide_size*t)] if offline else x_ref[:, :]
     q_target = np.concatenate((q_target, np.zeros((nbQ, q_target.shape[1]))), axis=0) if x_ref.shape[0] < nbQ else q_target
 
     kin_target = q_target if kin_data_to_track == 'q' else markers_target
     target = {"kin_target": [kin_target_idx, kin_target]}
     if track_emg:
         target["muscle_target"] = [muscles_target_idx, muscle_target]
+    # import matplotlib.pyplot as plt
+    # plt.figure()
+    # plt.plot(muscle_target_reduce[:, ::offline_emg_ratio].T)
+    # plt.show()
     return target
 
 
@@ -281,15 +286,29 @@ def update_mhe(mhe, t, sol, estimator_instance, muscle_track_idx, initial_time, 
                         markers_ref,
                         muscles_ref,
                         estimator_instance.ns_mhe,
-                        estimator_instance.rt_ratio,
+                        estimator_instance.markers_ratio,
+                        estimator_instance.EMG_ratio,
+                        estimator_instance.slide_size,
                         estimator_instance.track_emg,
                         estimator_instance.kin_data_to_track,
                         estimator_instance.model,
                         muscle_track_idx,
                         estimator_instance.test_offline
                         )
-    mhe.x_ref = x_ref[:, ::estimator_instance.rt_ratio][:, t: (estimator_instance.ns_mhe + 1 + t)]
-    mhe.muscles_ref = muscles_ref[:, ::estimator_instance.rt_ratio][:, t: estimator_instance.ns_mhe + t]
+    mhe.slide_size = estimator_instance.slide_size
+    if estimator_instance.test_offline:
+        mhe.x_ref = x_ref[:, ::estimator_instance.markers_ratio][:, estimator_instance.slide_size*t:(estimator_instance.ns_mhe + 1 + estimator_instance.slide_size*t)]
+        mhe.muscles_ref = muscles_ref[:, ::estimator_instance.EMG_ratio][:, estimator_instance.slide_size*t: estimator_instance.ns_mhe + estimator_instance.slide_size*t]
+    else:
+        mhe.x_ref = x_ref
+        mhe.muscles_ref = muscles_ref
+    # if t != 0:
+    #     import matplotlib.pyplot as plt
+    #     plt.figure()
+    #     # plt.plot(muscles_ref.T)
+    #     plt.plot(mhe.muscles_ref.T)
+    #     plt.show()
+
     for key in target.keys():
         mhe.update_objectives_target(target=target[key][1], list_index=target[key][0])
     if t != 0:
@@ -314,6 +333,10 @@ def update_mhe(mhe, t, sol, estimator_instance, muscle_track_idx, initial_time, 
                 pass
             estimator_instance.plot_queue.put_nowait(dic_to_put)
 
+        time_to_get_data = time() - tic
+        time_to_solve = sol.real_time_to_optimize
+        time_tot = time_to_solve + time_to_get_data
+
         if estimator_instance.save_results:
             data_to_save = {
                 "time": time() - initial_time,
@@ -329,11 +352,11 @@ def update_mhe(mhe, t, sol, estimator_instance, muscle_track_idx, initial_time, 
             data_to_save["muscles_target"] = target["muscle_target"][1][:, -1:] if "muscle_target" in target.keys() else 0
             kin_target = target["kin_target"][1][:, :, -2:-1] if estimator_instance.kin_data_to_track == "markers" else target["kin_target"][1][:, -2:-1]
             data_to_save["kin_target"] = kin_target
-            time_to_get_data = time() - tic
-            time_to_solve = sol.real_time_to_optimize
+            # time_to_get_data = time() - tic
+            # time_to_solve = sol.real_time_to_optimize
             # print(sol.real_time_to_optimize)
             # print(time_to_get_data)
-            time_tot = time_to_solve + time_to_get_data
+            # time_tot = time_to_solve + time_to_get_data
             # print(time_tot
             #       )
             data_to_save["sol_freq"] = 1 / time_tot
@@ -343,18 +366,20 @@ def update_mhe(mhe, t, sol, estimator_instance, muscle_track_idx, initial_time, 
 
             if estimator_instance.print_lvl == 1:
                 print(
-                    f"Solve Frequency : {1 / time_to_solve} \n"
+                    f"Solve Frequency : {1 / time_tot} \n"
                     f"Expected Frequency : {estimator_instance.exp_freq}\n"
                     f"time to sleep: {(1 / estimator_instance.exp_freq) - time_tot}\n"
                     f"time to get data = {time_to_get_data}"
                 )
-        time_to_get_data = time() - tic
-        time_to_solve = sol.real_time_to_optimize
-        time_tot = time_to_solve + time_to_get_data
+        current_time = time() - tic
+        time_tot = time_to_solve + current_time
         if 1 / time_tot > estimator_instance.exp_freq:
             sleep((1 / estimator_instance.exp_freq) - time_tot)
-    if t == 150:
-        return False
+    if estimator_instance.test_offline:
+        if t == 200:
+            return False
+        else:
+            return True
     else:
         return True
 
@@ -365,6 +390,7 @@ class CustomMhe(MovingHorizonEstimator):
         self.init_w_kalman = False
         self.x_ref = []
         self.muscles_ref = []
+        self.slide_size = 0
         # self.muscles_target = []
         # self.kin_target = []
 
@@ -374,11 +400,17 @@ class CustomMhe(MovingHorizonEstimator):
         x = sol.states["all"]
         u = sol.controls["all"][:, :-1]
         if self.init_w_kalman:
-            x0 = np.hstack((x[:, 1:], self.x_ref[:, -1:]))
+            x0 = np.hstack((x[:, self.slide_size:], self.x_ref[:, -self.slide_size:]))
             # x0 = self.x_ref[:, :]
         else:
-            x0 = np.hstack((x[:, 1:], x[:, -1:]))  # discard oldest estimate of the window, duplicates youngest
-        u0 = np.hstack((u[:, 1:], u[:, -2:-1]))
+            x0 = np.hstack((x[:, self.slide_size:], x[:, -self.slide_size:]))  # discard oldest estimate of the window, duplicates youngest
+        u0 = np.hstack((u[:, self.slide_size:], u[:, -self.slide_size:]))
+        # print(u.shape)
+        # print(x.shape)
+        if sol.status != 0 and sol.status != 2:
+            x0[:int(x.shape[0]/2), :] = self.x_ref[:int(x.shape[0]/2), -x0.shape[1]:]
+            u0[int(x.shape[0]/2):, :] = self.muscles_ref[:, -u0.shape[1]:]
+
         # u0 = self.muscles_ref
         x_init = InitialGuess(x0, interpolation=InterpolationType.EACH_FRAME)
         u_init = InitialGuess(u0, interpolation=InterpolationType.EACH_FRAME)

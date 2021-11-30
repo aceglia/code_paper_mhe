@@ -8,7 +8,7 @@ try:
     import opensim
 except ModuleNotFoundError:
     pass
-import C3DtoTRC
+from models.scaling import C3DtoTRC
 import csv
 from biosiglive.client import Client
 from biosiglive.server import Server
@@ -80,15 +80,15 @@ def EKF(model_path, scaling=False):
     # markers = Markers.from_c3d("/home/amedeo/Documents/programmation/code_paper_mhe/data/data_09_2021/flex_co.c3d")#, usecols=use_col)
     if scaling:
         # ---------- model scaling ------------ #
-        marker_names = ['STER', 'XIPH', 'C7', 'T10', 'CLAV_SC', 'CLAV_AC',
-                        'SCAP_IA', 'SCAP_AA', 'SCAP_TS', 'Acrom', 'EPICl', 'EPICm', 'LARM_elb', 'DELT', 'ARMl', 'STYLu',
-                        'STYLr']
+        # marker_names = ['STER', 'XIPH', 'C7', 'T10', 'CLAV_SC', 'CLAV_AC',
+        #                 'SCAP_IA', 'SCAP_AA', 'SCAP_TS', 'Acrom', 'EPICl', 'EPICm', 'LARM_elb', 'DELT', 'ARMl', 'STYLu',
+        #                 'STYLr']
 
         from pathlib import Path
         osim_model_path = "models/Wu_Shoulder_Model_mod_wt_wrapp.osim"
-        model_output = "models/" + Path(osim_model_path).stem + '_scaled.osim'
-        scaling_tool = "scaling_tool.xml"
-        trc_file = 'static_pose.trc'
+        model_output = "models/" + Path(osim_model_path).stem + '_remi_scaled.osim'
+        scaling_tool = "scale_tool.xml"
+        trc_file = 'data/test_18_11_21/gregoire/test_1/Anato03.trc'
         C3DtoTRC.WriteTrcFromMarkersData(trc_file,
                                          markers=markers[:3, :, :],
                                          marker_names=marker_names,
@@ -97,15 +97,26 @@ def EKF(model_path, scaling=False):
                                          n_frames=markers.shape[2],
                                          units="m").write()
 
+        import opensim as osim
         pyosim.Scale(model_input=osim_model_path,
                      model_output=model_output,
                      xml_input=scaling_tool,
-                     xml_output='scaling',
+                     xml_output='scaling_tool_output.xml',
                      static_path=trc_file
                     )
-        convert_model(in_path=model_output, out_path=Path(model_output).stem + '.bioMod', viz=False)
+
+        convert_model(in_path="models/" + Path(model_output).stem + "_markers.osim",
+                      out_path="models/" + Path(model_output).stem + '.bioMod', viz=False)
+
     else:
+        # from pyomeca import Markers
         bmodel = biorbd.Model(model_path)
+        # marker_names = []
+        # for i in range(len(bmodel.markerNames())):
+        #     marker_names.append(bmodel.markerNames()[i].to_string())
+        # markers_full = Markers.from_c3d(f"data/test_18_11_21/gregoire/test_1/flex.c3d", usecols=marker_names)
+        # marker_rate = int(markers_full.rate)
+        # marker_exp = markers_full[:, :, :].data * 1e-3
         q_recons, _ = Server.kalman_func(markers, model=bmodel)
         b = bioviz.Viz(model_path=model_path)
         b.load_movement(q_recons)
@@ -126,8 +137,9 @@ def convert_model(in_path, out_path, viz=None):
 
 
 if __name__ == '__main__':
-    model_path = "models/wu_model.bioMod"
-    EKF(model_path, scaling=True)
-    model_in = "Wu_Shoulder_Model_mod_wt_wrapp_scaled_markers.osim"
-    model_out = "models/Wu_Shoulder_Model_mod_wt_wrapp.bioMod"
-    convert_model(in_path=model_in, out_path=model_out, viz=True)
+    model_in = "data/data_30_11_21/Wu_Shoulder_Model_mod_wt_wrapp_remi_scaled.osim"
+    model_out = "data/data_30_11_21/Wu_Shoulder_Model_mod_wt_wrapp_remi_scaled.bioMod"
+    # convert_model(in_path=model_in, out_path=model_out, viz=True)
+    model_path = "data/data_30_11_21/Wu_Shoulder_Model_mod_wt_wrapp_remi.bioMod"
+    EKF(model_path, scaling=False)
+
