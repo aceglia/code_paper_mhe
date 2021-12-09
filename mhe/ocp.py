@@ -51,27 +51,15 @@ def force_func(biorbd_model, nlp, use_excitation=False):
 def get_reference_data(file_path):
     mat = sio.loadmat(file_path)
     return mat['kalman'], mat["markers"], mat["emg"]
-    # with open(file_path, "rb") as file:
-    #     data = pickle.load(file)
-    # states = data["data"][0]
-    # controls = data["data"][1]
-    # return states["q"][:, :], states["qdot"][:, :], states["muscles"][:, :], controls["muscles"][:, :]
 
 
-# New function for bioptim.mhe
 def define_objective(
     weights, use_excitation, use_torque, track_emg, muscles_target, kin_target, biorbd_model, kin_data_to_track="markers",
         muscle_track_idx=()
 ):
-    # muscle_track_idx = range(0, 34)
     muscle_min_idx = []
-    muscle_target_reduce = np.zeros((len(muscle_track_idx), muscles_target.shape[1]))
-    count = 0
     for i in range(biorbd_model.nbMuscles()):
-        if i in muscle_track_idx:
-            muscle_target_reduce[count, :] = muscles_target[i, :]
-            count += 1
-        else:
+        if i not in muscle_track_idx:
             muscle_min_idx.append(i)
 
     objectives = ObjectiveList()
@@ -80,7 +68,7 @@ def define_objective(
         objectives.add(
             ObjectiveFcn.Lagrange.TRACK_CONTROL,
             weight=weights["track_emg"],
-            target=muscle_target_reduce,
+            target=muscles_target,
             index=muscle_track_idx,
             key="muscles",
             multi_thread=False,
@@ -165,6 +153,7 @@ def prepare_mhe(
     )
 
     # Initial guesses
+    print(x0.shape)
     x_init = InitialGuess(np.concatenate((x0[:, :window_len+1], np.zeros((x0.shape[0], window_len+1)))),
                           interpolation=InterpolationType.EACH_FRAME)
 
@@ -230,33 +219,29 @@ def get_target(mhe, t, x_ref, markers_ref, muscles_ref, ns_mhe, markers_ratio, e
 
     # Define target
     # EMG target:
-    muscle_target_reduce = np.zeros((len(muscle_track_idx), muscles_ref.shape[1]))
-    count = 0
-    for i in range(muscles_ref.shape[0]):
-        if i in muscle_track_idx:
-            muscle_target_reduce[count, :] = muscles_ref[i, :]
-            count += 1
-    muscle_target = muscle_target_reduce[:, ::offline_emg_ratio][:, slide_size*t: (ns_mhe + 1 + slide_size*t)] if offline else muscle_target_reduce
+    # muscle_target_reduce = np.zeros((len(muscle_track_idx), muscles_ref.shape[1]))
+    # count = 0
+    # for i in range(muscles_ref.shape[0]):
+    #     if i in muscle_track_idx:
+    #         muscle_target_reduce[count, :] = muscles_ref[i, :]
+    #         count += 1
+    muscle_target = muscles_ref[:, slide_size*t: (ns_mhe + 1 + slide_size*t)] if offline else muscles_ref
 
     # Markers target:
-    markers_target = markers_ref[:3, :, ::markers_ratio][:3, :, slide_size*t: (ns_mhe + 1 + slide_size*t)] if offline else markers_ref
+    markers_target = markers_ref[:3, :, slide_size*t: (ns_mhe + 1 + slide_size*t)] if offline else markers_ref
     for i in range(markers_target.shape[2]):
         for j in range(markers_target.shape[1]):
             if np.product(markers_target[:3, j, i]) == 0:
                 markers_target[:3, j, i] = markers_ref[:3, j, i - 1]
 
     # Angle target:
-    q_target = x_ref[:, ::markers_ratio][:, slide_size*t: (ns_mhe + 1 + slide_size*t)] if offline else x_ref[:, :]
+    q_target = x_ref[:, slide_size*t: (ns_mhe + 1 + slide_size*t)] if offline else x_ref
     q_target = np.concatenate((q_target, np.zeros((nbQ, q_target.shape[1]))), axis=0) if x_ref.shape[0] < nbQ else q_target
 
     kin_target = q_target if kin_data_to_track == 'q' else markers_target
     target = {"kin_target": [kin_target_idx, kin_target]}
     if track_emg:
         target["muscle_target"] = [muscles_target_idx, muscle_target]
-    # import matplotlib.pyplot as plt
-    # plt.figure()
-    # plt.plot(muscle_target_reduce[:, ::offline_emg_ratio].T)
-    # plt.show()
     return target
 
 
@@ -267,19 +252,22 @@ def update_mhe(mhe, t, sol, estimator_instance, muscle_track_idx, initial_time, 
     if estimator_instance.test_offline:
         x_ref, markers_ref, muscles_ref = offline_data
     else:
-        # data = estimator_instance.get_data(t)
-        # x_ref = np.array(data["kalman"])
-        # markers_ref = np.array(data["markers"])
-        # muscles_ref = np.array(data["emg"])
-        while True:
-            try:
-                data = estimator_instance.data_queue.get_nowait()
-                x_ref = np.array(data["kalman"])
-                markers_ref = np.array(data["markers"])
-                muscles_ref = np.array(data["emg"])
-                break
-            except:
-                pass
+        if estimator_instance.data_process:
+            while True:
+                try:
+                    data = estimator_instance.data_queue.get_nowait()
+                    x_ref = np.array(data["kalman"])
+                    markers_ref = np.array(data["markers"])
+                    muscles_ref = np.array(data["emg"])
+                    break
+                except:
+                    pass
+        else:
+            data = estimator_instance.get_data(t)
+            x_ref = np.array(data["kalman"])
+            markers_ref = np.array(data["markers"])
+            muscles_ref = np.array(data["emg"])
+
     target = get_target(mhe,
                         t,
                         x_ref,
@@ -297,8 +285,8 @@ def update_mhe(mhe, t, sol, estimator_instance, muscle_track_idx, initial_time, 
                         )
     mhe.slide_size = estimator_instance.slide_size
     if estimator_instance.test_offline:
-        mhe.x_ref = x_ref[:, ::estimator_instance.markers_ratio][:, estimator_instance.slide_size*t:(estimator_instance.ns_mhe + 1 + estimator_instance.slide_size*t)]
-        mhe.muscles_ref = muscles_ref[:, ::estimator_instance.EMG_ratio][:, estimator_instance.slide_size*t: estimator_instance.ns_mhe + estimator_instance.slide_size*t]
+        mhe.x_ref = x_ref[:, estimator_instance.slide_size*t:(estimator_instance.ns_mhe + 1 + estimator_instance.slide_size*t)]
+        mhe.muscles_ref = muscles_ref[:, estimator_instance.slide_size*t: estimator_instance.ns_mhe + estimator_instance.slide_size*t]
     else:
         mhe.x_ref = x_ref
         mhe.muscles_ref = muscles_ref
@@ -376,7 +364,7 @@ def update_mhe(mhe, t, sol, estimator_instance, muscle_track_idx, initial_time, 
         if 1 / time_tot > estimator_instance.exp_freq:
             sleep((1 / estimator_instance.exp_freq) - time_tot)
     if estimator_instance.test_offline:
-        if t == 200:
+        if t == 120:
             return False
         else:
             return True
@@ -407,9 +395,9 @@ class CustomMhe(MovingHorizonEstimator):
         u0 = np.hstack((u[:, self.slide_size:], u[:, -self.slide_size:]))
         # print(u.shape)
         # print(x.shape)
-        if sol.status != 0 and sol.status != 2:
-            x0[:int(x.shape[0]/2), :] = self.x_ref[:int(x.shape[0]/2), -x0.shape[1]:]
-            u0[int(x.shape[0]/2):, :] = self.muscles_ref[:, -u0.shape[1]:]
+        # if sol.status != 0 and sol.status != 2:
+        #     x0[:int(x.shape[0]/2), :] = self.x_ref[:int(x.shape[0]/2), -x0.shape[1]:]
+        #     u0[int(x.shape[0]/2):, :] = self.muscles_ref[:, -u0.shape[1]:]
 
         # u0 = self.muscles_ref
         x_init = InitialGuess(x0, interpolation=InterpolationType.EACH_FRAME)

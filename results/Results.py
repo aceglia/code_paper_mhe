@@ -6,11 +6,15 @@ import os
 from pyomeca import Markers
 import matplotlib.pyplot as plt
 use_torque = True
-animate = True
+animate = False
 
 parent = os.path.dirname(os.getcwd())
-file_name = parent + "/" + "results/results_20211130/Results_MHE_q_EMG_act_torque_driven_test_20211130-1330"
-model = biorbd.Model(parent + "/data/data_30_11_21/Wu_Shoulder_Model_mod_wt_wrapp_remi.bioMod")
+import scipy.io as sio
+mat = sio.loadmat("/home/amedeo/Documents/programmation/code_paper_mhe/data/data_30_11_21/MVC.mat")
+mat_2 = sio.loadmat("/home/amedeo/Documents/programmation/code_paper_mhe/data/test_18_11_21/gregoire/test_1/test_abd.mat")
+
+file_name = parent + "/" + "results/results_20211207/Results_MHE_markers_EMG_act_torque_driven_test_20211207-1804"
+model = biorbd.Model(parent + "/data/data_30_11_21/Wu_Shoulder_Model_mod_wt_wrapp_Jules.bioMod")
 c3d = parent + "/data/data_09_2021/abd.c3d"
 mat = read_data(file_name)
 
@@ -34,7 +38,17 @@ if animate is True:
 
 U_est = mat["U_est"]
 U_ref = mat["muscles_target"]
-muscle_track_idx = [13, 15, 21, 10, 1, 2, 27, 14, 25, 26, 23, 24, 28, 29, 30]
+muscle_track_idx = [14, 25, 26,  # PEC
+                    13,  # DA
+                    15,  # DM
+                    21,  # DP
+                    23, 24,  # bic
+                    28, 29, 30,  # tri
+                    10,  # TRAPsup
+                    2,  # TRAPmed
+                    3,  # TRAPinf
+                    27  # Lat
+                    ]
 force_est_tmp = np.ndarray((model.nbMuscles(), 1))
 from biosiglive.server import Server
 Q, Qdot = Server.kalman_func(markers, model, True)
@@ -49,7 +63,7 @@ for i in range(U_est.shape[1]):
     muscles_states = model.stateSet()
     for k in range(model.nbMuscles()):
         muscles_states[k].setActivation(U_est[k, i])
-        biorbd_muscle.append(biorbd.HillThelenType(model.muscle(k)))
+        biorbd_muscle.append(biorbd.HillType(model.muscle(k)))
         biorbd_muscle[k].length(model, mat["X_est"][:model.nbQ(), i])
         muscles_FLCE[k, i] = biorbd_muscle[k].FlCE(muscles_states[k])
         biorbd_muscle[k].velocity(model, mat["X_est"][:model.nbQ(), i], mat["X_est"][model.nbQ():, i], True)
@@ -64,8 +78,8 @@ muscle_length = np.zeros((model.nbMuscles(), mat["X_est"].shape[1]))
 muscle_tendon_length = np.zeros((model.nbMuscles(), mat["X_est"].shape[1]))
 for m in range(model.nbMuscles()):
     for i in range(mat["X_est"].shape[1]):
-        muscle_length[m, i] = model.muscle(0).length(model, mat["X_est"][:model.nbQ(), i])
-        muscle_tendon_length[m, i] = model.muscle(0).musculoTendonLength(model, mat["X_est"][:model.nbQ(), i])
+        muscle_length[m, i] = model.muscle(m).length(model, mat["X_est"][:model.nbQ(), i])
+        muscle_tendon_length[m, i] = model.muscle(m).musculoTendonLength(model, mat["X_est"][:model.nbQ(), i])
 import matplotlib.pyplot as plt
 plt.figure("Muscle force component")
 for i in range(model.nbMuscles()):
@@ -83,7 +97,7 @@ plt.legend(labels=["FLPE", "FLCE", "FVCE"], bbox_to_anchor=(2, -0.50),loc="lower
 plt.figure("length")
 for i in range(model.nbMuscles()):
     plt.subplot(6, 6, i + 1)
-    # plt.plot(muscle_length[i, :], label="muscle length")
+    plt.plot(muscle_length[i, :] * np.cos(model.muscle(i).characteristics().pennationAngle()), label="muscle length")
     plt.plot(muscle_tendon_length[i, :], label="muscle tendon length")
     # plt.plot(muscles_FLPE[i, :], label="FLPE")
     # plt.plot(muscles_FLCE[i, :])
@@ -115,11 +129,14 @@ print(np.std(mat["sol_freq"][:500]))
 import matplotlib.pyplot as plt
 
 plt.figure("Q")
-for i in range(0,int(mat["X_est"].shape[0]/2)):
+for i in range(0, int(mat["X_est"].shape[0]/2)):
     plt.plot(mat["X_est"][i, :]*180/np.pi)
     # if len(mat["kin_target"].shape) == 2:
     #     plt.plot(mat["kin_target"][i, :]*180/np.pi, '0')
     plt.plot(mat["kalman"][i, :]*180/np.pi, 'x')
+    for k in range(mat["X_est"].shape[1]):
+        if mat["f_est"][i, k] < 0:
+            plt.axvline(x=k, alpha=0.2)
     # plt.plot(q_recons[i, :] * 180 / np.pi, 'x')
 
 plt.figure("Qdot")
@@ -140,13 +157,15 @@ count = 0
 plt.figure("Muscles")
 for i in muscle_track_idx:
     plt.subplot(lin, col, count + 1)
-    if isinstance(mat["muscles_target"], list):
-        plt.plot(np.zeros((1, mat["U_est"].shape[1])))
-    else:
+    # if isinstance(mat["muscles_target"], list):
+    #     plt.plot(np.zeros((1, mat["U_est"].shape[1])))
+    # else:
+    if i in muscle_track_idx:
         plt.plot(mat["muscles_target"][count, :], 'r')
+        count += 1
     plt.plot(mat["U_est"][i, :])
     plt.title(model.muscleNames()[i].to_string())
-    count += 1
+
 
 # Inverse dynamics
 # Choose a position/velocity/acceleration to compute dynamics from
@@ -158,20 +177,30 @@ Qddot = np.zeros((model.nbQ(),))
 Tau = model.InverseDynamics(Q, Qdot, Qddot)
 if "tau_est" in mat.keys():
     plt.figure("torque")
-    # plt.plot(mat["tau_est"][:, :].T)
-    plt.plot(Tau.to_array().T, 'x')
+    plt.plot(mat["tau_est"][:, :].T)
+    # plt.plot(Tau.to_array().T, 'x')
 
 # Compute muscular force at each iteration
 X_est = mat["X_est"]
 
+plt.figure("damping")
+for i in range(model.nbMuscles()):
+    plt.subplot(6, 6, i + 1)
+    plt.plot(np.abs(velocity[i, :])/(10 * model.muscle(i).characteristics().optimalLength()*0.1))
+    for k in range(mat["X_est"].shape[1]):
+        if mat["f_est"][i, k] < 0:
+            plt.axvline(x=k, alpha=0.2)
 
 plt.figure("Forces")
 for i in range(model.nbMuscles()):
     plt.subplot(6, 6, i + 1)
     plt.plot(mat["f_est"][i, :])
     plt.plot(muscle_force_ref[i, :])
-    plt.title(model.muscleNames()[i].to_string())
+    # plt.plot(model.muscle(i).characteristics().forceIsoMax()*(
+    #     mat["U_est"][i, :]*muscles_FLCE[i, :]*muscles_FVCE[i, :]+muscles_FLPE[i, :] + 0.1) * np.cos(model.muscle(i).characteristics().pennationAngle()), 'r')
 
+    plt.title(model.muscleNames()[i].to_string())
+plt.legend(labels=["force_est(casadi)", "force_est(eigen)", "force_from_act(python)"])
 delta_t = []
 t_ref = []
 plt.figure("time")

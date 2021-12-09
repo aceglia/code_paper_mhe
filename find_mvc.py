@@ -6,8 +6,8 @@ if __name__ == "__main__":
 
     # set file and directory to save
     file_name = "MVC.mat"
-    file_dir = "/home/amedeo/Documents/programmation/code_paper_mhe/data/data_30_11_21"
-    server_ip = "127.0.0.1"
+    file_dir = "/home/amedeo/Documents/programmation/code_paper_mhe/data/test_09_12_21/Mathis/"
+    server_ip = "192.168.1.211"
     device_host = "192.168.1.211"
     muscle_names = ["pec", "DA", "DM", "DP", "bic", "tri", "Trap_sup", "trap_med", "trap_inf", "lat"]
     # Run MVC

@@ -56,7 +56,7 @@ def read_sto_mot_file(filename):
 def EKF(model_path, scaling=False):
     server_ip = "192.168.1.211"
     server_port = 50000
-    n_marks = 15
+    n_marks = 16
     for i in range(5):
         client = Client(server_ip, server_port, "TCP")
         markers_tmp = client.get_data(
@@ -77,18 +77,20 @@ def EKF(model_path, scaling=False):
     #  "EPI_lat","EPI_med","ELB","DELT","ARM",
     #  "ULNA","RADIUS"]
     # from pyomeca import Markers
+    # import scipy.io as sio
+    # markers = sio.loadmat("data/data_30_11_21/RT_test/test_abd.mat")["markers"][:3, :, :]
     # markers = Markers.from_c3d("/home/amedeo/Documents/programmation/code_paper_mhe/data/data_09_2021/flex_co.c3d")#, usecols=use_col)
+
     if scaling:
         # ---------- model scaling ------------ #
-        # marker_names = ['STER', 'XIPH', 'C7', 'T10', 'CLAV_SC', 'CLAV_AC',
-        #                 'SCAP_IA', 'SCAP_AA', 'SCAP_TS', 'Acrom', 'EPICl', 'EPICm', 'LARM_elb', 'DELT', 'ARMl', 'STYLu',
-        #                 'STYLr']
-
+        marker_names = ['STER', 'XIPH', 'C7', 'T10', 'CLAV_SC', 'CLAV_AC',
+                        'SCAP_IA', 'SCAP_AA', 'Acrom', 'EPICl', 'EPICm', 'LARM_elb', 'DELT', 'ARMl', 'STYLu',
+                        'STYLr']
         from pathlib import Path
         osim_model_path = "models/Wu_Shoulder_Model_mod_wt_wrapp.osim"
         model_output = "models/" + Path(osim_model_path).stem + '_remi_scaled.osim'
         scaling_tool = "scale_tool.xml"
-        trc_file = 'data/test_18_11_21/gregoire/test_1/Anato03.trc'
+        trc_file = 'data/data_30_11_21/RT_test/test_abd.trc'
         C3DtoTRC.WriteTrcFromMarkersData(trc_file,
                                          markers=markers[:3, :, :],
                                          marker_names=marker_names,
@@ -103,7 +105,7 @@ def EKF(model_path, scaling=False):
                      xml_input=scaling_tool,
                      xml_output='scaling_tool_output.xml',
                      static_path=trc_file
-                    )
+                     )
 
         convert_model(in_path="models/" + Path(model_output).stem + "_markers.osim",
                       out_path="models/" + Path(model_output).stem + '.bioMod', viz=False)
@@ -122,7 +124,6 @@ def EKF(model_path, scaling=False):
         b.load_movement(q_recons)
         b.load_experimental_markers(markers)
         b.exec()
-        print(np.mean(q_recons[:6, :], axis=1))
 
 
 def convert_model(in_path, out_path, viz=None):
@@ -140,6 +141,6 @@ if __name__ == '__main__':
     model_in = "data/data_30_11_21/Wu_Shoulder_Model_mod_wt_wrapp_remi_scaled.osim"
     model_out = "data/data_30_11_21/Wu_Shoulder_Model_mod_wt_wrapp_remi_scaled.bioMod"
     # convert_model(in_path=model_in, out_path=model_out, viz=True)
-    model_path = "data/data_30_11_21/Wu_Shoulder_Model_mod_wt_wrapp_remi.bioMod"
+    model_path = "data/test_09_12_21/Mathis/Wu_Shoulder_Model_mod_wt_wrapp_Mathis.bioMod"
     EKF(model_path, scaling=False)
 
