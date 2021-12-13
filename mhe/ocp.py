@@ -1,6 +1,7 @@
 from .utils import *
 from time import time, sleep
 import biorbd_casadi as biorbd
+from biosiglive.data_processing import read_data
 import numpy as np
 import scipy.io as sio
 from casadi import MX, Function
@@ -49,8 +50,9 @@ def force_func(biorbd_model, nlp, use_excitation=False):
 
 
 def get_reference_data(file_path):
-    mat = sio.loadmat(file_path)
-    return mat['kalman'], mat["markers"], mat["emg"]
+    mat = read_data(file_path)
+    # mat = sio.loadmat(file_path)
+    return mat['kalman'], mat["markers"], mat["emg_proc"]
 
 
 def define_objective(
@@ -229,10 +231,11 @@ def get_target(mhe, t, x_ref, markers_ref, muscles_ref, ns_mhe, markers_ratio, e
 
     # Markers target:
     markers_target = markers_ref[:3, :, slide_size*t: (ns_mhe + 1 + slide_size*t)] if offline else markers_ref
-    for i in range(markers_target.shape[2]):
-        for j in range(markers_target.shape[1]):
-            if np.product(markers_target[:3, j, i]) == 0:
-                markers_target[:3, j, i] = markers_ref[:3, j, i - 1]
+    # print(markers_target.shape)
+    # for i in range(markers_target.shape[2]):
+    #     for j in range(markers_target.shape[1]):
+    #         if np.product(markers_target[:3, j, i]) == 0:
+    #             markers_target[:3, j, i] = markers_ref[:3, j, i - 1]
 
     # Angle target:
     q_target = x_ref[:, slide_size*t: (ns_mhe + 1 + slide_size*t)] if offline else x_ref
@@ -249,8 +252,13 @@ def update_mhe(mhe, t, sol, estimator_instance, muscle_track_idx, initial_time, 
     tic = time()
     if sol:
         print(sol.status)
+    # if t == 1:
+    #     import sys
+    #     sys.stdin = os.fdopen(0)
+    #     input("Ready to run estimator ? (press any key to continue)")
+
     if estimator_instance.test_offline:
-        x_ref, markers_ref, muscles_ref = offline_data
+        x_ref, markers_ref, muscles_target = offline_data
     else:
         if estimator_instance.data_process:
             while True:
@@ -258,7 +266,7 @@ def update_mhe(mhe, t, sol, estimator_instance, muscle_track_idx, initial_time, 
                     data = estimator_instance.data_queue.get_nowait()
                     x_ref = np.array(data["kalman"])
                     markers_ref = np.array(data["markers"])
-                    muscles_ref = np.array(data["emg"])
+                    muscles_target = np.array(data["emg"])
                     break
                 except:
                     pass
@@ -266,7 +274,20 @@ def update_mhe(mhe, t, sol, estimator_instance, muscle_track_idx, initial_time, 
             data = estimator_instance.get_data(t)
             x_ref = np.array(data["kalman"])
             markers_ref = np.array(data["markers"])
-            muscles_ref = np.array(data["emg"])
+            muscles_target = np.array(data["emg"])
+    muscles_ref = np.zeros((len(estimator_instance.muscle_track_idx), int(muscles_target.shape[1])))
+    muscles_ref[[0, 1, 2], :] = muscles_target[0, :]
+    muscles_ref[[3], :] = muscles_target[1, :]
+    muscles_ref[4, :] = muscles_target[2, :]
+    muscles_ref[5, :] = muscles_target[3, :]
+    muscles_ref[[6, 7], :] = muscles_target[4, :]
+    muscles_ref[[8, 9, 10], :] = muscles_target[5, :]
+    muscles_ref[[11], :] = muscles_target[6, :]
+    muscles_ref[[12], :] = muscles_target[7, :]
+    muscles_ref[[13], :] = muscles_target[8, :]
+    muscles_ref[[14], :] = muscles_target[9, :]
+    muscles_ref = muscles_ref / np.repeat(estimator_instance.mvc_list, muscles_target.shape[1]).reshape(
+        len(estimator_instance.mvc_list), muscles_target.shape[1])
 
     target = get_target(mhe,
                         t,
@@ -314,7 +335,7 @@ def update_mhe(mhe, t, sol, estimator_instance, muscle_track_idx, initial_time, 
         # plt.plot(x_ref[:, ::estimator_instance.rt_ratio][0, t:estimator_instance.ns_mhe + t + 1])
         # plt.show()
         if estimator_instance.data_to_show:
-            dic_to_put = {"t": t, "force_est": force_est, "q_est": q_est}
+            dic_to_put = {"t": t, "force_est": force_est.tolist(), "q_est": q_est.tolist()}
             try:
                 estimator_instance.plot_queue.get_nowait()
             except:

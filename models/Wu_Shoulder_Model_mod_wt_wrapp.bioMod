@@ -2,22 +2,22 @@ version 4
 
 // File extracted from models/Wu_Shoulder_Model_mod_wt_wrapp.osim
 
-gravity	0 -9.8000000000000007 0
+gravity	0 0 -9.8000000000000007
 
 // SEGMENT DEFINITION
 
 // Information about thorax segment
     // Segment
-    segment thorax_parent_offset
-        parent ground 
+    /*segment thorax_parent_offset
+        parent ground
         RTinMatrix    0
-        RT	0.0 0.0 0.0	xyz	0.0 0.0 0.0
+        RT	0 0 0 xyz 0 0 0
     endsegment
 
     // Segments to define transformation axis.
     // Segment
     segment thorax_translation
-        parent thorax_parent_offset 
+        parent thorax_parent_offset
         RTinMatrix    1
         RT
             1.0    0.0    0.0    0
@@ -32,12 +32,12 @@ gravity	0 -9.8000000000000007 0
 // Rotation transform was initially an orthogonal basis
     // Segment
     segment thorax_rotation_transform
-        parent thorax_translation 
+        parent thorax_translation
         RTinMatrix    1
         RT
+            1.0    0.0    0.0    0
             0.0    1.0    0.0    0
             0.0    0.0    1.0    0
-            1.0    0.0    0.0    0
             0    0    0    1
         rotations xyz
     endsegment
@@ -45,28 +45,32 @@ gravity	0 -9.8000000000000007 0
     // Segment to cancel transformation bases effect.
     // Segment
     segment thorax_reset_axis
-        parent thorax_rotation_transform 
+        parent thorax_rotation_transform
         RTinMatrix    1
         RT
-            0.0    0.0    1.0    0
             1.0    0.0    0.0    0
             0.0    1.0    0.0    0
+            0.0    0.0    1.0    0
             0    0    0    1
-    endsegment
+    endsegment*/
 
     //True segment where are applied inertial values.
     // Segment
     segment thorax
-        parent thorax_reset_axis 
+        parent ground
         RTinMatrix    0
-        RT	-0.0 -0.0 -0.0	xyz	0.0 0.0 0.0
+        // RT	1.9515931328660505 -1.634205138874465 0.5828923396260504	xyz	-0.05482439391735945 0.012442730207722387 1.501692948178758
+        //RT 0 0 0 xyz 0 0 0
+        RT -5.78 -1.79 -7.29 xyz -0.10 -0.0066 1.48
+        //rotations xyz
+        //translations xyz
         mass 20
         inertia
             1.4745    0.0    0.0
             0.0    0.7555    0.0
             0.0    0.0    1.4314
-        com    0 -0.002 0
-        meshfile Geometry/thorax_decimate.vtp
+        com    0 -0.0024948851425305404 0
+        meshfile Geometry/thorax.vtp
     endsegment
 
     // Markers
@@ -142,8 +146,8 @@ gravity	0 -9.8000000000000007 0
             -0.993896304    -0.110318322    -6.9262e-05    0
             0.006953371    -0.063271915    0.997972102    0
             0    0    0    1
-        rotations z
-        ranges		-1.570796326795	1.570796326795
+        //rotations z
+        //ranges		-1.570796326795	1.570796326795
     endsegment
 
     // Segment to cancel transformation bases effect.
@@ -214,6 +218,9 @@ gravity	0 -9.8000000000000007 0
             1.0    0.0    0.0    0
             0    0    0    1
         rotations xyz
+        ranges -6 6
+        -6 6
+        -6 6
     endsegment
 
     // Segment to cancel transformation bases effect.
@@ -293,7 +300,7 @@ gravity	0 -9.8000000000000007 0
             0.0001    0.691368442    0.722502365    0
             0    0    0    1
         rotations x
-        ranges		-1.9	0.35
+        ranges		-3 3
     endsegment
     // Segment
     segment humerus_shoulder_ele
@@ -305,7 +312,7 @@ gravity	0 -9.8000000000000007 0
             0.419865428    -0.691371096    0.587978766    0
             0    0    0    1
         rotations y
-        ranges		-0.3	3.0
+        ranges		-3 3
     endsegment
     // Segment
     segment humerus_shoulder_rotation
@@ -317,7 +324,7 @@ gravity	0 -9.8000000000000007 0
             0.620769081    0.52624238    -0.581132262    0
             0    0    0    1
         rotations z
-        ranges		0.0	3.0
+        ranges		-3 3
     endsegment
 
     // Segment to cancel transformation bases effect.
@@ -422,7 +429,7 @@ gravity	0 -9.8000000000000007 0
             -0.509491015    -0.550965176    0.660951042    0
             0    0    0    1
         rotations z
-        ranges		0.0	2.268928027593
+        ranges		-1	3
     endsegment
 
     // Segment to cancel transformation bases effect.
@@ -502,8 +509,8 @@ gravity	0 -9.8000000000000007 0
             0.64134492    0.607993134    0.46799684    0
             0.478279725    -0.793756795    0.375764096    0
             0    0    0    1
-        rotations y
-        ranges		-1.570796326795	1.570796326795
+        //rotations y
+        //ranges		-1.570796326795	1.570796326795
     endsegment
     // Segment
     segment radius_rotation3
@@ -583,7 +590,7 @@ musclegroup thorax_to_scapula
 endmusclegroup
 
     muscle    LVS
-        Type    hillthelen
+        Type    hill
         statetype    buchanan
         musclegroup    thorax_to_scapula
         OriginPosition    -0.037262999999999998 0.094437800000000002 0.022543799999999999
@@ -596,7 +603,7 @@ endmusclegroup
 
 
     muscle    TRP2
-        Type    hillthelen
+        Type    hill
         statetype    buchanan
         musclegroup    thorax_to_scapula
         OriginPosition    -0.077472100000000002 0.031457800000000001 0.0035691299999999998
@@ -609,7 +616,7 @@ endmusclegroup
 
 
     muscle    TRP3
-        Type    hillthelen
+        Type    hill
         statetype    buchanan
         musclegroup    thorax_to_scapula
         OriginPosition    -0.0921656 -0.015404899999999999 0.0025060199999999999
@@ -622,7 +629,7 @@ endmusclegroup
 
 
     muscle    TRP4
-        Type    hillthelen
+        Type    hill
         statetype    buchanan
         musclegroup    thorax_to_scapula
         OriginPosition    -0.115981 -0.10556400000000001 0.00068362499999999999
@@ -635,7 +642,7 @@ endmusclegroup
 
 
     muscle    RMN
-        Type    hillthelen
+        Type    hill
         statetype    buchanan
         musclegroup    thorax_to_scapula
         OriginPosition    -0.063 0.055961700000000003 0.0030000000000000001
@@ -648,7 +655,7 @@ endmusclegroup
 
 
     muscle    RMJ1
-        Type    hillthelen
+        Type    hill
         statetype    buchanan
         musclegroup    thorax_to_scapula
         OriginPosition    -0.079058900000000001 0.0094400400000000002 0.00143378
@@ -661,7 +668,7 @@ endmusclegroup
 
 
     muscle    RMJ2
-        Type    hillthelen
+        Type    hill
         statetype    buchanan
         musclegroup    thorax_to_scapula
         OriginPosition    -0.086999999999999994 -0.025000000000000001 0.00143378
@@ -674,7 +681,7 @@ endmusclegroup
 
 
     muscle    SRA1
-        Type    hillthelen
+        Type    hill
         statetype    buchanan
         musclegroup    thorax_to_scapula
         OriginPosition    -0.001 -0.056166300000000002 0.11981899999999999
@@ -699,7 +706,7 @@ endmusclegroup
         endviapoint
 
     muscle    SRA2
-        Type    hillthelen
+        Type    hill
         statetype    buchanan
         musclegroup    thorax_to_scapula
         OriginPosition    -0.00062592300000000002 -0.102011 0.137825
@@ -724,7 +731,7 @@ endmusclegroup
         endviapoint
 
     muscle    SRA3
-        Type    hillthelen
+        Type    hill
         statetype    buchanan
         musclegroup    thorax_to_scapula
         OriginPosition    -0.011373400000000001 -0.16181699999999999 0.148868
@@ -755,7 +762,7 @@ musclegroup thorax_to_clavicle
 endmusclegroup
 
     muscle    TRP1
-        Type    hillthelen
+        Type    hill
         statetype    buchanan
         musclegroup    thorax_to_clavicle
         OriginPosition    -0.058960100000000001 0.0968498 0.0019247699999999999
@@ -768,7 +775,7 @@ endmusclegroup
 
 
     muscle    SBCL
-        Type    hillthelen
+        Type    hill
         statetype    buchanan
         musclegroup    thorax_to_clavicle
         OriginPosition    -0.000927862 -0.013199000000000001 0.0391262
@@ -787,7 +794,7 @@ musclegroup scapula_to_thorax
 endmusclegroup
 
     muscle    PMN
-        Type    hillthelen
+        Type    hill
         statetype    buchanan
         musclegroup    scapula_to_thorax
         OriginPosition    0.012 -0.041270000000000001 -0.026519999999999998
@@ -806,7 +813,7 @@ musclegroup humerus_to_clavicle
 endmusclegroup
 
     muscle    DELT1
-        Type    hillthelen
+        Type    hill
         statetype    buchanan
         musclegroup    humerus_to_clavicle
         OriginPosition    0.0045591099999999999 -0.103949 0.0077551599999999997
@@ -825,7 +832,7 @@ endmusclegroup
         endviapoint
 
     muscle    PECM1
-        Type    hillthelen
+        Type    hill
         statetype    buchanan
         musclegroup    humerus_to_clavicle
         OriginPosition    0.016 -0.040495700000000003 0.0050000000000000001
@@ -850,7 +857,7 @@ musclegroup humerus_to_scapula
 endmusclegroup
 
     muscle    DELT2
-        Type    hillthelen
+        Type    hill
         statetype    buchanan
         musclegroup    humerus_to_scapula
         OriginPosition    0.0045591099999999999 -0.103949 0.0077551599999999997
@@ -875,7 +882,7 @@ endmusclegroup
         endviapoint
 
     muscle    SUPSP
-        Type    hillthelen
+        Type    hill
         statetype    buchanan
         musclegroup    humerus_to_scapula
         OriginPosition    0.014254899999999999 0.0168443 0.020943799999999999
@@ -900,7 +907,7 @@ endmusclegroup
         endviapoint
 
     muscle    INFSP
-        Type    hillthelen
+        Type    hill
         statetype    buchanan
         musclegroup    humerus_to_scapula
         OriginPosition    -0.0050975700000000001 0.0080408700000000003 0.026396699999999999
@@ -919,7 +926,7 @@ endmusclegroup
         endviapoint
 
     muscle    SUBSC
-        Type    hillthelen
+        Type    hill
         statetype    buchanan
         musclegroup    humerus_to_scapula
         OriginPosition    0.0199995 -0.0083117299999999998 -0.00174873
@@ -944,7 +951,7 @@ endmusclegroup
         endviapoint
 
     muscle    TMIN
-        Type    hillthelen
+        Type    hill
         statetype    buchanan
         musclegroup    humerus_to_scapula
         OriginPosition    0.00655633 -0.00365417 0.021678099999999999
@@ -969,7 +976,7 @@ endmusclegroup
         endviapoint
 
     muscle    TMAJ
-        Type    hillthelen
+        Type    hill
         statetype    buchanan
         musclegroup    humerus_to_scapula
         OriginPosition    0.003699 -0.044999999999999998 -0.0067630399999999997
@@ -994,7 +1001,7 @@ musclegroup scapula_to_humerus
 endmusclegroup
 
     muscle    DELT3
-        Type    hillthelen
+        Type    hill
         statetype    buchanan
         musclegroup    scapula_to_humerus
         OriginPosition    -0.059062499999999997 -0.0015687100000000001 -0.038460599999999998
@@ -1019,7 +1026,7 @@ endmusclegroup
         endviapoint
 
     muscle    CORB
-        Type    hillthelen
+        Type    hill
         statetype    buchanan
         musclegroup    scapula_to_humerus
         OriginPosition    0.012500000000000001 -0.041270000000000001 -0.026519999999999998
@@ -1038,7 +1045,7 @@ musclegroup scapula_to_radius
 endmusclegroup
 
     muscle    bic_l
-        Type    hillthelen
+        Type    hill
         statetype    buchanan
         musclegroup    scapula_to_radius
         OriginPosition    -0.035394200000000001 -0.0266676 -0.0147901
@@ -1099,7 +1106,7 @@ endmusclegroup
         endviapoint
 
     muscle    bic_s
-        Type    hillthelen
+        Type    hill
         statetype    buchanan
         musclegroup    scapula_to_radius
         OriginPosition    0.0143708 -0.0445517 -0.0297503
@@ -1142,7 +1149,7 @@ musclegroup humerus_to_thorax
 endmusclegroup
 
     muscle    PECM2
-        Type    hillthelen
+        Type    hill
         statetype    buchanan
         musclegroup    humerus_to_thorax
         OriginPosition    0.016 -0.035495699999999998 0.0050000000000000001
@@ -1161,7 +1168,7 @@ endmusclegroup
         endviapoint
 
     muscle    PECM3
-        Type    hillthelen
+        Type    hill
         statetype    buchanan
         musclegroup    humerus_to_thorax
         OriginPosition    0.016 -0.029999999999999999 0.0050000000000000001
@@ -1180,7 +1187,7 @@ endmusclegroup
         endviapoint
 
     muscle    LAT
-        Type    hillthelen
+        Type    hill
         statetype    buchanan
         musclegroup    humerus_to_thorax
         OriginPosition    0.0099175200000000008 -0.022333700000000001 -0.008822
@@ -1223,7 +1230,7 @@ musclegroup scapula_to_ulna
 endmusclegroup
 
     muscle    tric_long
-        Type    hillthelen
+        Type    hill
         statetype    buchanan
         musclegroup    scapula_to_ulna
         OriginPosition    -0.044392899999999999 -0.056349799999999999 -0.013452799999999999
@@ -1254,7 +1261,7 @@ musclegroup humerus_to_ulna
 endmusclegroup
 
     muscle    tric_lat
-        Type    hillthelen
+        Type    hill
         statetype    buchanan
         musclegroup    humerus_to_ulna
         OriginPosition    -0.0065191900000000002 -0.137632 0.00465811
@@ -1273,7 +1280,7 @@ endmusclegroup
         endviapoint
 
     muscle    tric_med
-        Type    hillthelen
+        Type    hill
         statetype    buchanan
         musclegroup    humerus_to_ulna
         OriginPosition    -0.0091203099999999995 -0.14904800000000001 -0.0098603800000000002

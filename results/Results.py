@@ -13,8 +13,8 @@ import scipy.io as sio
 mat = sio.loadmat("/home/amedeo/Documents/programmation/code_paper_mhe/data/data_30_11_21/MVC.mat")
 mat_2 = sio.loadmat("/home/amedeo/Documents/programmation/code_paper_mhe/data/test_18_11_21/gregoire/test_1/test_abd.mat")
 
-file_name = parent + "/" + "results/results_20211207/Results_MHE_markers_EMG_act_torque_driven_test_20211207-1804"
-model = biorbd.Model(parent + "/data/data_30_11_21/Wu_Shoulder_Model_mod_wt_wrapp_Jules.bioMod")
+file_name = parent + "/" + "results/results_20211213/Results_MHE_markers_EMG_act_torque_driven_test_20211213-1418"
+model = biorbd.Model(parent + "/data/test_09_12_21/Jules/Wu_Shoulder_Model_mod_wt_wrapp_Jules.bioMod")
 c3d = parent + "/data/data_09_2021/abd.c3d"
 mat = read_data(file_name)
 
@@ -37,7 +37,7 @@ if animate is True:
 
 
 U_est = mat["U_est"]
-U_ref = mat["muscles_target"]
+# U_ref = mat["muscles_target"]
 muscle_track_idx = [14, 25, 26,  # PEC
                     13,  # DA
                     15,  # DM
@@ -220,7 +220,10 @@ if len(mat["kin_target"].shape) != 2:
     # for i in range(mat["kin_target"].shape[2]):
     #     mark_est[:, :, i] = get_markers(mat["X_est"][:2, i])
 
-    for i in range(15):
-        plt.plot(mat["kin_target"][:, i, :].T, "-r")
+    for i in range(mat["kin_target"].shape[1]):
+        plt.subplot(4, 4, i+1)
+        plt.plot(mat["kin_target"][0, i, :].T)#, "-r")
+        plt.plot(mat["kin_target"][1, i, :].T)#, "-r")
+        plt.plot(mat["kin_target"][2, i, :].T)#, "-r")
         # plt.plot(mark_est[:, i, :].T, "--b")
 plt.show()
