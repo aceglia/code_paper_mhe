@@ -16,8 +16,8 @@ import scipy.io as sio
 # mat = sio.loadmat("/home/amedeo/Documents/programmation/code_paper_mhe/data/data_30_11_21/MVC.mat")
 # mat_2 = sio.loadmat("/home/amedeo/Documents/programmation/code_paper_mhe/data/test_18_11_21/gregoire/test_1/test_abd.mat")
 
-file_name = parent + "/" + "results/Jules/Results_MHE_markers_EMG_act_torque_driven_test_20220113-1640"
-model = biorbd.Model(parent + "/data/test_09_12_21/Jules/Wu_Shoulder_Model_mod_wt_wrapp_Jules.bioMod")
+file_name = parent + "/" + "results/Jules/Results_MHE_markers_EMG_act_torque_driven_test_20220113-1820"
+model = biorbd.Model(parent + "/data/test_09_12_21/Jules/Wu_Shoulder_Model_mod_wt_wrapp_Jules_scaled_with_mot.bioMod")
 c3d = parent + "/data/data_09_2021/abd.c3d"
 mat = read_data(file_name)
 

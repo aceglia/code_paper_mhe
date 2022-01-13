@@ -462,13 +462,13 @@ if __name__ == "__main__":
                 ]
     subject = "Jules"
     data_dir = f"data/test_09_12_21/{subject}/"
-    offline_path = data_dir + 'test_abd'
+    offline_path = data_dir + 'test_abd_scaled'
     result_dir = subject
     is_mhe = True
     configuration_dic = {
-        # "model_path": data_dir + f"Wu_Shoulder_Model_mod_wt_wrapp_{subject}_scaled_with_mot.bioMod",
-        "model_path": data_dir + f"Wu_Shoulder_Model_mod_wt_wrapp_{subject}.bioMod",
-        "mhe_time": 0.15,
+        "model_path": data_dir + f"Wu_Shoulder_Model_mod_wt_wrapp_{subject}_scaled_with_mot.bioMod",
+        # "model_path": data_dir + f"Wu_Shoulder_Model_mod_wt_wrapp_{subject}.bioMod",
+        "mhe_time": 0.1,
         "interpol_factor": 1,
         "use_torque": True,
         "use_excitation": False,

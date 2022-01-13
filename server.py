@@ -23,7 +23,7 @@ if __name__ == '__main__':
             model_path=data_dir + f"Wu_Shoulder_Model_mod_wt_wrapp_{subject}_scaled_with_mot.bioMod",
             recons_kalman=True,
             output_dir=data_dir,
-            output_file='test_' + motion,
+            output_file='test_' + motion + '_scaled',
             offline_file_path=offline_file_path
         )
 

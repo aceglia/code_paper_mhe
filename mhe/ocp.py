@@ -98,7 +98,7 @@ def define_objective(
         kin_target_thorax = kin_target[:3, :4, :]
         kin_target_bodies = kin_target[:3, 4:, :]
         idx_thorax = [0, 1, 2, 3]
-        thorax_weight_ratio = 100
+        thorax_weight_ratio = 1000
         idx_bodies = list(range(4, biorbd_model.nbMarkers()))
         objectives.add(kin_funct,
                        weight=kin_weight / thorax_weight_ratio,
@@ -166,8 +166,8 @@ def prepare_problem(
         x_bounds[0].concatenate(
             Bounds([activation_min] * biorbd_model.nbMuscles(), [activation_max] * biorbd_model.nbMuscles())
         )
-    x_bounds[0].min[: biorbd_model.nbQ(), 0] = x0[: biorbd_model.nbQ(), 0] - 0.1
-    x_bounds[0].max[: biorbd_model.nbQ(), 0] = x0[: biorbd_model.nbQ(), 0] + 0.1
+    # x_bounds[0].min[: biorbd_model.nbQ(), 0] = x0[: biorbd_model.nbQ(), 0] - 0.1
+    # x_bounds[0].max[: biorbd_model.nbQ(), 0] = x0[: biorbd_model.nbQ(), 0] + 0.1
     # x_bounds.
     # Control path constraint
     u_bounds = BoundsList()
@@ -238,7 +238,7 @@ def prepare_problem(
         solver.set_nlp_solver_type("SQP_RTI")
         solver.set_print_level(0)
         solver.set_maximum_iterations(10)
-        # solver.set_qp_solver_cond_N(5)
+        solver.set_qp_solver_cond_N(2)
     else:
         solver.set_nlp_solver_type("SQP_RTI")
         solver.set_print_level(0)
@@ -257,10 +257,10 @@ def prepare_problem(
 
 def configure_weights(track_emg=True, is_mhe=True, kin_data='markers', use_excitation=False):
     weights = {
-        "track_markers": 1000000,
+        "track_markers": 100000,
         "min_control": 100,
         "min_dq": 100,
-        "min_q": 10,
+        "min_q": 100,
         "min_torque": 100,
         "min_act": 1,
         "track_emg": 10000
