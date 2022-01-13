@@ -238,7 +238,7 @@ def prepare_problem(
         solver.set_nlp_solver_type("SQP_RTI")
         solver.set_print_level(0)
         solver.set_maximum_iterations(10)
-        solver.set_qp_solver_cond_N(5)
+        # solver.set_qp_solver_cond_N(5)
     else:
         solver.set_nlp_solver_type("SQP_RTI")
         solver.set_print_level(0)
@@ -257,13 +257,13 @@ def prepare_problem(
 
 def configure_weights(track_emg=True, is_mhe=True, kin_data='markers', use_excitation=False):
     weights = {
-        "track_markers": 100000,
+        "track_markers": 1000000,
         "min_control": 100,
         "min_dq": 100,
-        "min_q": 1,
+        "min_q": 10,
         "min_torque": 100,
         "min_act": 1,
-        "track_emg": 1000
+        "track_emg": 10000
     }
 
     if is_mhe:
@@ -376,7 +376,7 @@ def update_mhe(mhe, t, sol, estimator_instance, muscle_track_idx, initial_time, 
 
     if estimator_instance.test_offline:
         x_ref, markers_target, muscles_target = offline_data
-        x_ref = x_ref[6:, :]
+
     else:
         if estimator_instance.data_process:
             while True:
@@ -431,7 +431,6 @@ def update_mhe(mhe, t, sol, estimator_instance, muscle_track_idx, initial_time, 
     # muscles_ref[[14], :] = muscles_target[9, :]
     muscles_ref = muscles_ref / np.repeat(estimator_instance.mvc_list, muscles_target.shape[1]).reshape(
         len(estimator_instance.mvc_list), muscles_target.shape[1])
-    
     target = get_target(mhe,
                         t,
                         x_ref,

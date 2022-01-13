@@ -54,7 +54,7 @@ emg = a
 # emg = emg[:, ::20]
 # sio.savemat(f"./sujet_{sujet}/mvc_sujet_{sujet}.mat", {'mvc_treat': mvc_list_max})
 # sio.savemat(data_dir + "MVC.mat", {'mvc_treat': mvc_list_max})
-model = data_dir + f'Wu_Shoulder_Model_mod_wt_wrapp_{subject}_scaled_with_mot.bioMod'
+model = data_dir + f'Wu_Shoulder_Model_mod_wt_wrapp_{subject}.bioMod'
 # model = data_dir + f'Wu_Shoulder_Model_mod_wt_wrapp_{subject}.bioMod'
 # model = os.path.dirname(os.getcwd()) + '/models/arm_wt_rot_scap.bioMod'
 # model = "/home/amedeo/Documents/programmation/RT_Optim/models/wu_model.bioMod"

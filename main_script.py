@@ -160,7 +160,7 @@ class MuscleForceEstimator:
         self.muscles_target[[8, 9, 10], :] = muscles_target[5, :]
         self.muscles_target[[11], :] = muscles_target[6, :]
         self.muscles_target[[12], :] = muscles_target[7, :]
-        self.muscles_target[[13], :] = muscles_target[8, :]
+        self.muscles_target[[13], :] = muscles_target[9, :]
         # self.muscles_target[[14], :] = muscles_target[9, :]
         self.muscles_target = self.muscles_target / np.repeat(
             mvc_list, muscles_target.shape[1]).reshape(len(mvc_list), muscles_target.shape[1])
@@ -181,7 +181,6 @@ class MuscleForceEstimator:
         self.dof_names = []
         for i in range(biorbd_model.nbQ()):
             self.dof_names.append(biorbd_model.nameDof()[i].to_string())
-
         objectives = define_objective(
             weights=self.weights,
             use_excitation=self.use_excitation,
@@ -367,7 +366,7 @@ class MuscleForceEstimator:
 
         if self.test_offline:
             x_ref, markers_ref, muscles_ref = get_reference_data(self.offline_file)
-            offline_data = [x_ref, markers_ref, muscles_ref[:, :]]
+            offline_data = [x_ref[6:, :], markers_ref, muscles_ref[:-1, :]]
             # import matplotlib.pyplot as plt
             # plt.figure()
             # plt.plot(muscles_ref.T)
@@ -476,7 +475,7 @@ if __name__ == "__main__":
         "save_results": True,
         "track_emg": True,
         "init_w_kalman": False,
-        "kin_data_to_track": "q",
+        "kin_data_to_track": "markers",
         "mvc_list": mvc_list,
         'muscle_track_idx': [14, 25, 26,  # PEC
                              13,  # DA

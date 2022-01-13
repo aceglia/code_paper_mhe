@@ -9,14 +9,14 @@ import os
 from pyomeca import Markers
 import matplotlib.pyplot as plt
 use_torque = True
-animate = False
+animate = True
 
 parent = os.path.dirname(os.getcwd())
 import scipy.io as sio
 # mat = sio.loadmat("/home/amedeo/Documents/programmation/code_paper_mhe/data/data_30_11_21/MVC.mat")
 # mat_2 = sio.loadmat("/home/amedeo/Documents/programmation/code_paper_mhe/data/test_18_11_21/gregoire/test_1/test_abd.mat")
 
-file_name = parent + "/" + "results/Jules/Results_MHE_markers_EMG_act_torque_driven_test_20220113-1459"
+file_name = parent + "/" + "results/Jules/Results_MHE_markers_EMG_act_torque_driven_test_20220113-1640"
 model = biorbd.Model(parent + "/data/test_09_12_21/Jules/Wu_Shoulder_Model_mod_wt_wrapp_Jules.bioMod")
 c3d = parent + "/data/data_09_2021/abd.c3d"
 mat = read_data(file_name)
@@ -239,10 +239,10 @@ for i in range(model.nbMuscles()):
     plt.subplot(6, 6, i + 1)
     plt.plot(mat["f_est"][i, :])
     plt.plot(muscle_force_ref[i, :])
-    plt.plot(model.muscle(i).characteristics().forceIsoMax()*(
-        mat["U_est"][i, :]*muscles_FLCE[i, :]*muscles_FVCE[i, :]
-        +muscles_FLPE[i, :] + (velocity[i, :]/(10)*0.1)
-     * np.cos(model.muscle(i).characteristics().pennationAngle())), 'r')
+    # plt.plot(model.muscle(i).characteristics().forceIsoMax()*(
+    #     mat["U_est"][i, :]*muscles_FLCE[i, :]*muscles_FVCE[i, :]
+    #     +muscles_FLPE[i, :] + (velocity[i, :]/(10)*0.1)
+    #  * np.cos(model.muscle(i).characteristics().pennationAngle())), 'r')
     for k in range(force_from_act.shape[1]):
         if mat["f_est"][i, k] < 0:
             plt.axvline(x=k, alpha=0.2)
