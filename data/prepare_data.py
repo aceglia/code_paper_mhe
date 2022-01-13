@@ -6,7 +6,8 @@ from biosiglive.server import Server
 import os
 import biorbd
 
-data_dir = "test_09_12_21/Jules/"
+subject = "Jules"
+data_dir = f"test_09_12_21/{subject}/"
 
 # # DA, DM, DP, TS, TM, TI, LAT, PEC, BIC, TRimed
 muscle_names = ["pec.IM EMG1", "DA.IM EMG2", "DM.IM EMG3", "DP.IM EMG4", "bic.IM EMG5", "tri.IM EMG6",
@@ -38,7 +39,7 @@ muscle_names = ["pec.IM EMG1", "DA.IM EMG2", "DM.IM EMG3", "DP.IM EMG4", "bic.IM
 # mvc_list_max = -np.sort(-mvc_list_max, 1)[:, :2000]
 # mvc_list_max = np.mean(mvc_list_max, 1)
 
-trial_name = "fonction"
+trial_name = "abd"
 data_path = data_dir + trial_name
 a = Analogs.from_c3d(f"{data_path}.c3d", usecols=muscle_names)
 emg = a
@@ -53,7 +54,8 @@ emg = a
 # emg = emg[:, ::20]
 # sio.savemat(f"./sujet_{sujet}/mvc_sujet_{sujet}.mat", {'mvc_treat': mvc_list_max})
 # sio.savemat(data_dir + "MVC.mat", {'mvc_treat': mvc_list_max})
-model = data_dir + 'Wu_Shoulder_Model_mod_wt_wrapp_Jules.bioMod'
+model = data_dir + f'Wu_Shoulder_Model_mod_wt_wrapp_{subject}_scaled_with_mot.bioMod'
+# model = data_dir + f'Wu_Shoulder_Model_mod_wt_wrapp_{subject}.bioMod'
 # model = os.path.dirname(os.getcwd()) + '/models/arm_wt_rot_scap.bioMod'
 # model = "/home/amedeo/Documents/programmation/RT_Optim/models/wu_model.bioMod"
 bmodel = biorbd.Model(model)
@@ -100,10 +102,10 @@ markers_full = np.nan_to_num(markers_full)
 #         else:
 #             markers_exp[:3, i, f] = markers_full[:3, i, f]
 #             markers_forw[:3, i, f] = markers_full[:3, i, f]
-#
+# #
 # b = bioviz.Viz(model_path=model, show_floor=False, show_muscles=True, show_gravity_vector=False)
+# b.load_experimental_markers(markers_full * 0.001)
 # b.load_movement(q_recons)
-# b.load_experimental_markers(markers_forw)
 # b.exec()
 
-sio.savemat(data_dir + f"test_{trial_name}.mat", {'emg': emg, "markers": markers_full, "kalman": q_recons})
+sio.savemat(data_dir + f"test_{trial_name}_for_server.mat", {'emg': emg, "markers": markers_full, "kalman": q_recons})

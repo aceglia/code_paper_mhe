@@ -25,10 +25,13 @@ class MuscleForceEstimator:
         self.data_to_show = [""]
         self.kin_data_to_track = None
         self.init_w_kalman = False
+        self.is_mhe = True
+        self.test_offline = False
+        self.offline_file = None
 
         # Variables of the problem
-        self.exp_freq = 30
-        self.ns_mhe = 7
+        self.exp_freq = 20
+        self.ns_mhe = 0
         self.mhe_time = 0.1
         self.markers_rate = 100
         self.emg_rate = 2000
@@ -57,10 +60,12 @@ class MuscleForceEstimator:
         self.count_p_f, self.count_p_q = [], []
         self.mvc_list = []
         self.interpol_factor = 1
+        self.weights = {}
+        self.result_dir = None
+        self.ns_full = 0
 
         for key in conf.keys():
             self.__dict__[key] = conf[key]
-
         self.T_mhe = self.mhe_time
         self.ns_mhe = int(self.T_mhe * self.markers_rate * self.interpol_factor)
         self.slide_size = int((1 / self.exp_freq) / (1 / self.markers_rate) * self.interpol_factor)
@@ -84,7 +89,6 @@ class MuscleForceEstimator:
 
     def prepare_problem(self):
         biorbd_model = biorbd.Model(self.model_path)
-        # def _init_mhe(self):
 
         self.data_to_get = []
         # if self.kin_data_to_track == "markers":
@@ -94,33 +98,60 @@ class MuscleForceEstimator:
         # if self.track_emg:
         self.data_to_get.append("emg")
         from scipy import interpolate
-
         if self.test_offline is True:
-            self.x_ref, self.markers_target, muscles_target = get_reference_data(offline_path)
-        # else:
-        #     nb_of_data = self.ns_mhe + 1  # if t == 0 else 2
-        #     vicon_client = Client(self.server_ip, self.server_port, type="TCP")
-        #     data = vicon_client.get_data(
-        #         self.data_to_get,
-        #         read_frequency=self.markers_rate,
-        #         nb_of_data_to_export=nb_of_data,
-        #         nb_frame_of_interest=self.ns_mhe,
-        #         get_names=self.get_names,
-        #         get_kalman=self.get_kalman,
-        #         norm_emg=False,
-        #         # mvc_list=self.mvc_list
-        #     )
-        #     self.x_ref = np.array(data["kalman"])
-        #     markers_target = np.array(data["markers"])
-        #     muscles_target = np.array(data["emg"])
-        # self.markers_target = np.zeros(
-        #     (3, biorbd_model.nbMarkers(), int(markers_target.shape[2] * self.interpol_factor)))
+            x_ref, markers_target, muscles_target = get_reference_data(offline_path)
+            muscles_target = muscles_target[:, :]
+            # x_ref = x_ref[:, :]
+            x_ref = x_ref[6:, :]
+        else:
+            nb_of_data = self.ns_mhe + 1  # if t == 0 else 2
+            vicon_client = Client(self.server_ip, self.server_port, type="TCP")
+            data = vicon_client.get_data(
+                self.data_to_get,
+                read_frequency=self.markers_rate,
+                nb_of_data_to_export=nb_of_data,
+                nb_frame_of_interest=self.ns_mhe,
+                get_names=self.get_names,
+                get_kalman=self.get_kalman,
+                norm_emg=False,
+                # mvc_list=self.mvc_list
+            )
+            x_ref = np.array(data["kalman"])[6:, :]
+            markers_target = np.array(data["markers"])
+            muscles_target = np.array(data["emg"])
+        window_len = self.ns_mhe if self.is_mhe else self.ns_full
+        window_duration = self.T_mhe if self.is_mhe else window_len / self.markers_rate
+        # interpolate target
+        if self.interpol_factor != 1:
+            # x_ref
+            x = np.linspace(0, x_ref.shape[1] / 100, x_ref.shape[1])
+            f_x = interpolate.interp1d(x, x_ref)
+            x_new = np.linspace(0, x_ref.shape[1] / 100, int(x_ref.shape[1] * self.interpol_factor))
+            self.x_ref = f_x(x_new)
+
+            # markers_ref
+            self.markers_target = np.zeros(
+                (3, biorbd_model.nbMarkers(), int(markers_target.shape[2] * self.interpol_factor)))
+            for i in range(3):
+                x = np.linspace(0, markers_target.shape[2] / 100, markers_target.shape[2])
+                f_mark = interpolate.interp1d(x, markers_target[i, :, :])
+                x_new = np.linspace(0, markers_target.shape[2] / 100,
+                                    int(markers_target.shape[2] * self.interpol_factor))
+                self.markers_target[i, :, :] = f_mark(x_new)
+
+            # muscle_target
+            x = np.linspace(0, muscles_target.shape[1] / 100, muscles_target.shape[1])
+            f_mus = interpolate.interp1d(x, muscles_target)
+            x_new = np.linspace(0, muscles_target.shape[1] / 100,
+                                int(muscles_target.shape[1] * self.interpol_factor))
+            muscles_target = f_mus(x_new)
+        else:
+            self.markers_target = markers_target
+            self.x_ref = x_ref
+
         self.muscles_target = np.zeros(
-            (len(self.muscle_track_idx), int(muscles_target.shape[1] * self.interpol_factor)))
-        # x = np.linspace(0, self.x_ref.shape[1] / 100, self.x_ref.shape[1])
-        # f_x = interpolate.interp1d(x, self.x_ref)
-        # x_new = np.linspace(0, self.x_ref.shape[1] / 100, int(self.x_ref.shape[1] * self.interpol_factor))
-        # self.x_ref = f_x(x_new)
+            (len(self.muscle_track_idx), int(muscles_target.shape[1])))
+
         self.muscles_target[[0, 1, 2], :] = muscles_target[0, :]
         self.muscles_target[[3], :] = muscles_target[1, :]
         self.muscles_target[4, :] = muscles_target[2, :]
@@ -130,19 +161,9 @@ class MuscleForceEstimator:
         self.muscles_target[[11], :] = muscles_target[6, :]
         self.muscles_target[[12], :] = muscles_target[7, :]
         self.muscles_target[[13], :] = muscles_target[8, :]
-        self.muscles_target[[14], :] = muscles_target[9, :]
-        self.muscles_target = self.muscles_target/np.repeat(mvc_list, muscles_target.shape[1]).reshape(len(mvc_list), muscles_target.shape[1])
-        # for i in range(3):
-        #     x = np.linspace(0, markers_target.shape[2] / 100, markers_target.shape[2])
-        #     f_mark = interpolate.interp1d(x, markers_target[i, :, :])
-        #     x_new = np.linspace(0, markers_target.shape[2] / 100,
-        #                         int(markers_target.shape[2] * self.interpol_factor))
-        #     self.markers_target[i, :, :] = f_mark(x_new)
-        #
-        # x = np.linspace(0, self.muscles_target.shape[1] / 100, self.muscles_target.shape[1])
-        # f_mus = interpolate.interp1d(x, self.muscles_target)
-        # x_new = np.linspace(0, self.muscles_target.shape[1] / 100,
-        #                     int(self.muscles_target.shape[1] * self.interpol_factor))
+        # self.muscles_target[[14], :] = muscles_target[9, :]
+        self.muscles_target = self.muscles_target / np.repeat(
+            mvc_list, muscles_target.shape[1]).reshape(len(mvc_list), muscles_target.shape[1])
 
         # self.x_ref = np.zeros((biorbd_model.nbQ(), self.ns_mhe + 1))
         # casadi funct:
@@ -151,8 +172,9 @@ class MuscleForceEstimator:
         # markers = biorbd.to_casadi_func("Markers", biorbd_model.markers, q_sym)
         # self.markers_target[:, :, 0] = np.array(markers(self.x_ref[:biorbd_model.nbQ(), -1]))
         # self.markers_target = np.repeat(self.markers_target, self.ns_mhe + 1, axis=2)
-        self.muscles_target = self.muscles_target[:, :self.ns_mhe]
-        self.kin_target = self.markers_target[:,:,:self.ns_mhe+1] if self.kin_data_to_track == "markers" else self.x_ref[:self.nbQ, :self.ns_mhe+1]
+
+        self.muscles_target = self.muscles_target[:, :window_len]
+        self.kin_target = self.markers_target[:, :, :window_len + 1] if self.kin_data_to_track == "markers" else self.x_ref[:self.nbQ, :window_len+1]
 
         for i in range(biorbd_model.nbMuscles()):
             self.muscle_names.append(biorbd_model.muscleNames()[i].to_string())
@@ -160,58 +182,8 @@ class MuscleForceEstimator:
         for i in range(biorbd_model.nbQ()):
             self.dof_names.append(biorbd_model.nameDof()[i].to_string())
 
-        if self.track_emg:
-            weight = {
-                "track_markers": 10000000,
-                "track_q": 100000,
-                "min_control": 100,
-                "min_dq": 100,
-                "min_q": 10,
-                "min_torque": 10,
-                "min_act": 1,
-                "track_emg": 10000
-            }
-        # if self.track_emg:
-        #     weight = {
-        #         "track_markers": 1000000,
-        #         "track_q": 100000,
-        #         "min_control": 100,
-        #         "min_dq": 10,
-        #         "min_q": 1,
-        #         "min_torque": 100,
-        #         "min_act": 1,
-        #         "track_emg": 10,
-        #     }
-        else:
-            weight = {"track_markers": 100000,
-                      "track_q": 1000000, "min_dq": 100, "min_q": 1, "min_torque": 1000, "min_act": 1}
-            if self.use_excitation:
-                weight["min_control"] = 10
-            else:
-                weight["min_control"] = 1
-
-        if self.kin_data_to_track == "q":
-            if self.track_emg:
-                weight = {
-                    "track_markers": 1000000,
-                    "track_q": 100000,
-                    "min_control": 1000,
-                    "min_dq": 100,
-                    "min_q": 10,
-                    "min_torque": 1000,
-                    "min_act": 1,
-                    "track_emg": 10000,
-                }
-            else:
-                weight = {"track_markers": 10000000,
-                          "track_q": 1000000, "min_dq": 10, "min_q": 1, "min_torque": 10000, "min_act": 1}
-                if self.use_excitation:
-                    weight["min_control"] = 10
-                else:
-                    weight["min_control"] = 1
-
         objectives = define_objective(
-            weights=weight,
+            weights=self.weights,
             use_excitation=self.use_excitation,
             use_torque=self.use_torque,
             track_emg=self.track_emg,
@@ -222,19 +194,20 @@ class MuscleForceEstimator:
             muscle_track_idx=self.muscle_track_idx
         )
 
-        self.mhe, self.solver = prepare_mhe(
+        self.mhe, self.solver = prepare_problem(
             biorbd_model,
             objectives,
-            window_len=self.ns_mhe,
-            window_duration=self.T_mhe,
+            window_len=window_len,
+            window_duration=window_duration,
             x0=self.x_ref,
             use_torque=self.use_torque,
             use_excitation=self.use_excitation,
-            nb_threads=6,
+            nb_threads=8,
+            is_mhe=self.is_mhe
         )
-
-        nlp = self.mhe.nlp[0]
-        self.get_force = force_func(biorbd_model, nlp, use_excitation=self.use_excitation)
+        if not self.is_mhe:
+            self.ocp = self.mhe
+        self.get_force = force_func(biorbd_model, use_excitation=self.use_excitation)
         self.force_est = np.ndarray((biorbd_model.nbMuscles(), 1))
     # @staticmethod
 
@@ -293,6 +266,11 @@ class MuscleForceEstimator:
         self.data_to_show = data_to_show
         self.test_offline = test_offline
         self.offline_file = offline_file
+        if self.test_offline and not self.offline_file:
+            raise RuntimeError("Please provide a data file to run offline program")
+        if not self.is_mhe and not self.test_offline:
+            raise RuntimeError("Online optimisation only available using MHE implementation")
+
         proc_plot, proc_get_data = [], []
         self.data_process = data_process
         t = 0
@@ -301,10 +279,9 @@ class MuscleForceEstimator:
         #     proc_get_data.start()
 
         if self.data_to_show:
-            # proc_plot = self.process(name="plot", target=MuscleForceEstimator.run_plot, args=(self,))
-            proc_plot = self.process(name="plot", target=MuscleForceEstimator.send_plot_data, args=(self,))
+            proc_plot = self.process(name="plot", target=MuscleForceEstimator.run_plot, args=(self,))
+            # proc_plot = self.process(name="plot", target=MuscleForceEstimator.send_plot_data, args=(self,))
             proc_plot.start()
-
 
         proc_mhe = self.process(name="mhe", target=MuscleForceEstimator.run_mhe, args=(self, var, server_ip, server_port, data_to_show))
         proc_mhe.start()
@@ -320,12 +297,12 @@ class MuscleForceEstimator:
     def send_plot_data(self):
         server_address = '127.0.0.1'
         port = 50001
-        client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        client.connect((server_address, port))
+        # client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        # client.connect((server_address, port))
         dict_to_send = {"model_path": self.model_path, "data_to_show": self.data_to_show}
         encoded_data = json.dumps(dict_to_send).encode()
         encoded_data = struct.pack('>I', len(encoded_data)) + encoded_data
-        client.sendall(encoded_data)
+        # client.sendall(encoded_data)
         data = []
         self.plot_event.set()
         while True:
@@ -337,10 +314,10 @@ class MuscleForceEstimator:
 
             if is_working:
                 client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                client.connect((server_address, port))
+                # client.connect((server_address, port))
                 encoded_data = json.dumps(data).encode()
                 encoded_data = struct.pack('>I', len(encoded_data)) + encoded_data
-                client.sendall(encoded_data)
+                # client.sendall(encoded_data)
 
     def run_plot(self):
         for data_to_show in self.data_to_show:
@@ -390,7 +367,7 @@ class MuscleForceEstimator:
 
         if self.test_offline:
             x_ref, markers_ref, muscles_ref = get_reference_data(self.offline_file)
-            offline_data = [x_ref, markers_ref, muscles_ref]
+            offline_data = [x_ref, markers_ref, muscles_ref[:, :]]
             # import matplotlib.pyplot as plt
             # plt.figure()
             # plt.plot(muscles_ref.T)
@@ -400,18 +377,54 @@ class MuscleForceEstimator:
         self.model = biorbd.Model(self.model_path)
         initial_time = time()
         # muscle_track_idx = [0, 1, 2, 3, 4, 11, 12, 13, 17, 18, 19, 20, 21, 24, 25, 26]
+        if self.is_mhe:
+            final_sol = self.mhe.solve(
+                lambda mhe, i, sol: update_mhe(mhe, i, sol, self,
+                                               initial_time=initial_time,
+                                               muscle_track_idx=self.muscle_track_idx,
+                                               offline_data=offline_data),
+                export_options={'frame_to_export': self.ns_mhe - 1},
+                solver=self.solver
+            )
+            # final_sol.animate()
+            final_sol.graphs()
+        else:
+            final_sol = self.ocp.solve(solver=self.solver)
+            print(final_sol.status)
+            # final_sol.animate()
+            # final_sol.graphs()
+            if self.save_results:
+                data_to_save = {
+                    "time": time() - initial_time,
+                    "X_est": final_sol.states["all"],
+                    "U_est": final_sol.controls["muscles"],
+                    "kalman": self.x_ref[:, :self.ns_full],
+                    # "f_est": force_est,
+                    "init_w_kalman": self.init_w_kalman,
+                    "none_conv_iter": final_sol.status,
+                    "Nmhe": self.ns_full,
+                    "muscles_target": self.muscles_target[:, :self.ns_full] if self.track_emg else
+                    np.zerros((len(self.muscle_track_idx), self.ns_full))
+                }
+                if self.kin_data_to_track == 'q':
+                    kin_target = self.x_ref[:, :self.ns_full]
+                else:
+                    kin_target = self.markers_target[:, :self.ns_full]
 
-        final_sol = self.mhe.solve(
-            lambda mhe, i, sol: update_mhe(mhe, i, sol, self,
-                                           initial_time=initial_time,
-                                           muscle_track_idx=self.muscle_track_idx,
-                                           offline_data=offline_data),
-            export_options={'frame_to_export': self.ns_mhe - 1},
-            solver=self.solver
-        )
-        # final_sol.animate()
-        final_sol.graphs()
-        return final_sol
+                data_to_save["kin_target"] = kin_target
+                data_to_save["sol_freq"] = 1 / data_to_save["time"]
+                data_to_save["exp_freq"] = self.exp_freq
+                data_to_save["sleep_time"] = (1 / self.exp_freq) - data_to_save["time"]
+                save_results(final_sol,
+                             data_to_save,
+                             self.current_time,
+                             self.kin_data_to_track,
+                             self.track_emg,
+                             self.use_torque,
+                             self.use_excitation,
+                             self.result_dir,
+                             is_mhe=self.is_mhe)
+                print("result saved")
 
 
 if __name__ == "__main__":
@@ -434,7 +447,7 @@ if __name__ == "__main__":
     #             0.00025902, 0.00025902, 0.00025902,
     #             0.00039303,
     #             0.000239,
-    #             0.00019446,
+    #             # 0.00045,
     #             0.00010913
     #             ]
     mvc_list = [0.00015725, 0.00015725, 0.00015725,  # Jules
@@ -445,19 +458,25 @@ if __name__ == "__main__":
                 0.00038563, 0.00038563, 0.00038563,
                 0.00031154,
                 0.00064221,
-                0.00064,
-                0.00017983
+                # 0.0008,
+                0.00057983
                 ]
-    data_dir = "data/test_09_12_21/Jules/"
+    subject = "Jules"
+    data_dir = f"data/test_09_12_21/{subject}/"
+    offline_path = data_dir + 'test_abd'
+    result_dir = subject
+    is_mhe = True
     configuration_dic = {
-        "model_path": data_dir + 'Wu_Shoulder_Model_mod_wt_wrapp_Jules.bioMod',
+        # "model_path": data_dir + f"Wu_Shoulder_Model_mod_wt_wrapp_{subject}_scaled_with_mot.bioMod",
+        "model_path": data_dir + f"Wu_Shoulder_Model_mod_wt_wrapp_{subject}.bioMod",
+        "mhe_time": 0.15,
         "interpol_factor": 1,
         "use_torque": True,
         "use_excitation": False,
         "save_results": True,
         "track_emg": True,
         "init_w_kalman": False,
-        "kin_data_to_track": "markers",
+        "kin_data_to_track": "q",
         "mvc_list": mvc_list,
         'muscle_track_idx': [14, 25, 26,  # PEC
                              13,  # DA
@@ -467,15 +486,24 @@ if __name__ == "__main__":
                              28, 29, 30,  # tri
                              10,  # TRAPsup
                              2,  # TRAPmed
-                             3,  # TRAPinf
+                             # 3,  # TRAPinf
                              27  # Lat
                              ],
+        "result_dir": result_dir,
+        "is_mhe": is_mhe,
+        "ns_full": 600,
     }
 
     if configuration_dic["kin_data_to_track"] == 'markers':
-        configuration_dic["exp_freq"] = 20
+        configuration_dic["exp_freq"] = 15
     else:
         configuration_dic["exp_freq"] = 20
+    weights = configure_weights(track_emg=configuration_dic["track_emg"],
+                                is_mhe=is_mhe,
+                                kin_data=configuration_dic["kin_data_to_track"]
+                                )
+
+    configuration_dic["weights"] = weights
 
     variables_dic = {
         "plot_force_freq": 10,
@@ -489,7 +517,6 @@ if __name__ == "__main__":
     # server_ip = "192.168.1.211"
     server_ip = "127.0.0.1"
     server_port = 50000
-    offline_path = data_dir + 'test_abd'
     MHE = MuscleForceEstimator(configuration_dic)
     MHE.run(variables_dic,
             server_ip,

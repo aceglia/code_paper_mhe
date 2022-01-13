@@ -61,14 +61,24 @@ def compute_force(sol, get_force, nbMT, use_excitation=False):
     return force_est, q_est, dq_est, a_est, u_est
 
 
-def save_results(sol, data, current_time, kin_data_to_track, track_emg=False, use_torque=True, use_excitation=False):
+def save_results(sol,
+                 data,
+                 current_time,
+                 kin_data_to_track,
+                 track_emg=False,
+                 use_torque=True,
+                 use_excitation=False,
+                 result_dir=None,
+                 is_mhe=True):
     if use_torque:
         data["tau_est"] = sol.controls["tau"][:, -2:-1]
     dyn = "act" if use_excitation is not True else "exc"
     torque = "_torque" if use_torque else ""
     emg = "EMG_" if track_emg else ""
-    result_dir = f"results_{strftime('%Y%m%d-%H%M')[:8]}"
+    full = "full_" if not is_mhe else ""
+    result_dir = result_dir if result_dir else f"results_{strftime('%Y%m%d-%H%M')[:8]}"
     if not os.path.isdir(f"results/{result_dir}"):
         os.mkdir(f"results/{result_dir}")
-    data_path = f"results/{result_dir}/Results_MHE_{kin_data_to_track}_{emg}{dyn}{torque}_driven_test_{current_time}"
+    data_path = f"results/{result_dir}/" \
+                f"Results_MHE_{kin_data_to_track}_{emg}{dyn}{torque}_driven_test_{full}{current_time}"
     add_data_to_pickle(data, data_path)

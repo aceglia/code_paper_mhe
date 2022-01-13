@@ -62,7 +62,7 @@ class WriteTrc:
             self._read_c3d()
         headers = self._prepare_trc()
         duration = self.n_frames / self.data_rate
-        time = np.around(np.linspace(0, duration, self.n_frames), decimals=4) if self.time is None else self.time
+        time = np.around(np.linspace(0, duration, self.n_frames), decimals=2) if self.time is None else self.time
         for frame in range(self.markers.shape[2]):
             row = [frame + 1, time[frame]]
             for i in range(self.markers.shape[1]):
@@ -135,6 +135,6 @@ class WriteTrcFromMarkersData(WriteTrc):
 if __name__ == '__main__':
     # outfile_path = "data.trc"
     # infile_path = "data.c3d"
-    outfile_path = "abd.trc"
-    infile_path = "/home/amedeo/Documents/programmation/RT_Optim/data_wu_model/abd.c3d"
+    outfile_path = "data/test_09_12_21/Jules/abd.trc"
+    infile_path = "data/test_09_12_21/Jules/abd.c3d"
     WriteTrcFromC3d(output_file_path=outfile_path, c3d_file_path=infile_path).write()
