@@ -5,13 +5,48 @@ import bioviz
 from biosiglive.server import Server
 import os
 import biorbd
+from biosiglive.data_processing import read_data, add_data_to_pickle
+import matplotlib.pyplot as plt
 
-subject = "Jules"
-data_dir = f"test_09_12_21/{subject}/"
+# trial = "flex"
+# subject = "Clara"
+# scaled = True
+# scal = "_scaled" if scaled else ""
+# trial = "hand_cycling"
+# mat = read_data(f"/home/amedeo/Documents/programmation/data_article/{subject}/{trial}")
+# markers = mat["kin_target"]
+# emg = mat["muscles_target"]
+# plt.figure("Muscles")
+# # for i in muscle_track_idx:
+# # for i in range(emg.shape[0]):
+# #     plt.subplot(4, 5, i + 1)
+# #     plt.plot(emg[i, :])
+# # plt.show()
+# model_path = f"/home/amedeo/Documents/programmation/data_article/{subject}/Wu_Shoulder_Model_mod_wt_wrapp_{subject}{scal}.bioMod"
+#
+# model = biorbd.Model(model_path)
+# q_recons, _ = Server.kalman_func(markers, model=model)
+# # q_recons = mat["kalman"]
+# # b = bioviz.Viz(model_path=model_path, show_floor=False, show_muscles=True, show_gravity_vector=False)
+# # b.load_experimental_markers(markers)
+# # b.load_movement(q_recons)
+# # b.exec()
+# data_to_save = {"emg": emg, "markers": markers, "kalman": q_recons[:, :]}
+# # data_to_save = {"emg": emg, "markers": markers, "kalman": mat["kalman"]}
+# data_path = f"/home/amedeo/Documents/programmation/data_article/{subject}/{trial}{scal}"
+# if os.path.isfile(data_path):
+#     os.remove(data_path)
+# add_data_to_pickle(data_to_save, f"/home/amedeo/Documents/programmation/data_article/{subject}/{trial}{scal}")
+
+subject = "Remi"
+# data_dir = f"test_09_12_21/{subject}/"
+data_dir = f"/home/amedeo/Documents/programmation/data_article/{subject}/"
 
 # # DA, DM, DP, TS, TM, TI, LAT, PEC, BIC, TRimed
+# muscle_names = ["pec.IM EMG1", "DA.IM EMG2", "DM.IM EMG3", "DP.IM EMG4", "bic.IM EMG5", "tri.IM EMG6",
+#                 "TRAPsup.IM EMG7", "TRAPmed.IM EMG8", "TRAPinf.IM EMG9", "lat.IM EMG10"]
 muscle_names = ["pec.IM EMG1", "DA.IM EMG2", "DM.IM EMG3", "DP.IM EMG4", "bic.IM EMG5", "tri.IM EMG6",
-                "TRAPsup.IM EMG7", "TRAPmed.IM EMG8", "TRAPinf.IM EMG9", "lat.IM EMG10"]
+                "trap_sup.IM EMG7", "trap_med.IM EMG8", "trap_inf.IM EMG9", "lat.IM EMG10"]
 
 # # --- MVC --- #
 # mvc_list = ["MVC_bic", "MVC_DA", "MVC_DM", "MVC_DP", "MVC_lat", "MVC_pec", "MVC_TI", "MVC_TM", "MVC_tri",
@@ -39,7 +74,7 @@ muscle_names = ["pec.IM EMG1", "DA.IM EMG2", "DM.IM EMG3", "DP.IM EMG4", "bic.IM
 # mvc_list_max = -np.sort(-mvc_list_max, 1)[:, :2000]
 # mvc_list_max = np.mean(mvc_list_max, 1)
 
-trial_name = "abd"
+trial_name = "fonction"
 data_path = data_dir + trial_name
 a = Analogs.from_c3d(f"{data_path}.c3d", usecols=muscle_names)
 emg = a
@@ -103,9 +138,9 @@ markers_full = np.nan_to_num(markers_full)
 #             markers_exp[:3, i, f] = markers_full[:3, i, f]
 #             markers_forw[:3, i, f] = markers_full[:3, i, f]
 # #
-# b = bioviz.Viz(model_path=model, show_floor=False, show_muscles=True, show_gravity_vector=False)
-# b.load_experimental_markers(markers_full * 0.001)
-# b.load_movement(q_recons)
-# b.exec()
+b = bioviz.Viz(model_path=model, show_floor=False, show_muscles=True, show_gravity_vector=False)
+b.load_experimental_markers(markers_full * 0.001)
+b.load_movement(q_recons)
+b.exec()
 
 sio.savemat(data_dir + f"test_{trial_name}_for_server.mat", {'emg': emg, "markers": markers_full, "kalman": q_recons})

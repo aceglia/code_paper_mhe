@@ -69,16 +69,17 @@ def save_results(sol,
                  use_torque=True,
                  use_excitation=False,
                  result_dir=None,
+                 file_name=None,
                  is_mhe=True):
     if use_torque:
         data["tau_est"] = sol.controls["tau"][:, -2:-1]
     dyn = "act" if use_excitation is not True else "exc"
     torque = "_torque" if use_torque else ""
-    emg = "EMG_" if track_emg else ""
-    full = "full_" if not is_mhe else ""
-    result_dir = result_dir if result_dir else f"results_{strftime('%Y%m%d-%H%M')[:8]}"
-    if not os.path.isdir(f"results/{result_dir}"):
-        os.mkdir(f"results/{result_dir}")
-    data_path = f"results/{result_dir}/" \
-                f"Results_MHE_{kin_data_to_track}_{emg}{dyn}{torque}_driven_test_{full}{current_time}"
+    emg = "_EMG_" if track_emg else "_"
+    full = "full_" if not is_mhe else "mhe_"
+    file_name = file_name if file_name else f"Results_{full}{kin_data_to_track}{emg}{dyn}{torque}_driven_{current_time}"
+    result_dir = result_dir if result_dir else f"results/results_{strftime('%Y%m%d-%H%M')[:8]}"
+    if not os.path.isdir(f"results/"):
+        os.mkdir(f"results/")
+    data_path = f"{result_dir}/{file_name}"
     add_data_to_pickle(data, data_path)
