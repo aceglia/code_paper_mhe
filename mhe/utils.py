@@ -17,32 +17,15 @@ def check_and_adjust_dim(*args):
 
 
 def update_plot(estimator_instance, t, force_est, q_est):
-    # conf = MuscleForceEstimator._check_and_adjust_dim(*args)
     if estimator_instance.data_to_show.count("force") != 0:
         estimator_instance.force_to_plot = np.append(estimator_instance.force_to_plot[:, -estimator_instance.exp_freq - 1:], force_est, axis=1)
-        # if estimator_instance.count_p_f == estimator_instance.plot_force_ratio:
         update_plot_force(
             estimator_instance.force_to_plot, estimator_instance.p_force, estimator_instance.app_force, estimator_instance.plot_force_ratio, estimator_instance.muscle_names
-        )  # , box_force)
+        )
         estimator_instance.count_p_f = 0
-        # else:
         estimator_instance.count_p_f += 1
-
     if estimator_instance.data_to_show.count("q") != 0:
-        # estimator_instance.q_to_plot = np.append(estimator_instance.q_to_plot[:, -estimator_instance.exp_freq - 1 :], q_est.reshape(-1, 1), axis=1)
-        # # if estimator_instance.count_p_q == estimator_instance.plot_force_ratio:
-        # update_plot_q(
-        #     estimator_instance.q_to_plot * (180 / np.pi),
-        #     estimator_instance.p_q,
-        #     estimator_instance.app_q,
-        #     estimator_instance.box_q
-        # )
-        # estimator_instance.count_p_q = 0
-        # estimator_instance.b.load_experimental_markers(estimator_instance.kin_target[:, :, -1:])
         estimator_instance.b.set_q(q_est[:, -1])
-        # estimator_instance.b.update()
-        # else:
-        #     estimator_instance.count_p_q += 1
 
 
 def compute_force(sol, get_force, nbMT, use_excitation=False):

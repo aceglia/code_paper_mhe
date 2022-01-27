@@ -201,11 +201,10 @@ def prepare_problem(
         x_bounds[0].concatenate(
             Bounds([activation_min] * biorbd_model.nbMuscles(), [activation_max] * biorbd_model.nbMuscles())
         )
-    # x_bounds[0].min[: biorbd_model.nbQ(), 0] = x0[: biorbd_model.nbQ(), 0] - 0.1
-    # x_bounds[0].max[: biorbd_model.nbQ(), 0] = x0[: biorbd_model.nbQ(), 0] + 0.1
+
     x_bounds[0].min[biorbd_model.nbQ():, :] = [[-20] * 3] * biorbd_model.nbQ()
     x_bounds[0].max[biorbd_model.nbQ():, :] = [[20] * 3] * biorbd_model.nbQ()
-    # x_bounds.
+
     # Control path constraint
     u_bounds = BoundsList()
     u_bounds.add(
@@ -221,27 +220,27 @@ def prepare_problem(
     else:
         x_init = InitialGuess(np.concatenate((x0[:, :window_len+1], np.zeros((x0.shape[0], window_len+1)))),
                               interpolation=InterpolationType.EACH_FRAME)
-        # x0 = np.array([0] * biorbd_model.nbQ() * 2)
-        # x_init = InitialGuess(np.tile(x0, (window_len + 1, 1)).T, interpolation=InterpolationType.EACH_FRAME)
 
     u0 = np.array([tau_init] * nbGT + [muscle_init] * nbMT)
     u_init = InitialGuess(np.tile(u0, (window_len, 1)).T, interpolation=InterpolationType.EACH_FRAME)
-    nb_mus = biorbd_model.nbMuscles()
-    # Get initial isometric forces
-    f_iso = []
-    for k in range(nb_mus):
-        f_iso.append(biorbd_model.muscle(k).characteristics().forceIsoMax().to_mx())
 
-    # Define the parameter to optimize
-    bound_p_iso = Bounds(
-        [0.5] * nb_mus, [2.5] * nb_mus, interpolation=InterpolationType.CONSTANT)
-    p_init = [1] * nb_mus
-    from bioptim import Objective
-    parameter_objective_functions = Objective(
-        my_target_function, weight=10000, quadratic=True, custom_type=ObjectiveFcn.Parameter, target=[1] * nb_mus
-    )
-    p_iso_init = InitialGuess(p_init)
     if use_parameters:
+        nb_mus = biorbd_model.nbMuscles()
+        # Get initial isometric forces
+        f_iso = []
+        for k in range(nb_mus):
+            f_iso.append(biorbd_model.muscle(k).characteristics().forceIsoMax().to_mx())
+
+        # Define the parameter to optimize
+        bound_p_iso = Bounds(
+            [0.5] * nb_mus, [2.5] * nb_mus, interpolation=InterpolationType.CONSTANT)
+        p_init = [1] * nb_mus
+        from bioptim import Objective
+        parameter_objective_functions = Objective(
+            my_target_function, weight=10000, quadratic=True, custom_type=ObjectiveFcn.Parameter, target=[1] * nb_mus
+        )
+        p_iso_init = InitialGuess(p_init)
+
         parameters = ParameterList()
         parameters.add(
             "p_iso",  # The name of the parameter
@@ -285,34 +284,16 @@ def prepare_problem(
             parameters=parameters,
             use_sx=True,
         )
-    # mhe = MovingHorizonEstimator(
-    #     biorbd_model=biorbd_model,
-    #     dynamics=dynamics,
-    #     window_len=window_len,
-    #     window_duration=window_duration,
-    #     objective_functions=objectives,
-    #     x_init=x_init,
-    #     u_init=u_init,
-    #     x_bounds=x_bounds,
-    #     u_bounds=u_bounds,
-    #     n_threads=nb_threads,
-    #     # use_sx=False
-    # )
 
     solver = Solver.ACADOS()
     solver.set_convergence_tolerance([1e-4, 1e-4, 1e-4, 1e-1])
     solver.set_integrator_type("IRK")
     solver.set_qp_solver("PARTIAL_CONDENSING_HPIPM")
-    # solver.set_qp_solver("FULL_CONDENSING_QPOASES")
 
     if is_mhe:
         solver.set_nlp_solver_type("SQP_RTI")
         solver.set_print_level(0)
         solver.set_maximum_iterations(50)
-        # solver.set_option(val=1, name="sim_method_jac_reuse")
-        # solver.set_option(val=0.5, name="nlp_solver_step_length")
-        # # solver.set_option(val=5, name="qp_solver_cond_N")
-        # solver.set_option(val=200.0, name="levenberg_marquardt")
         for key in solver_options.keys():
             solver.set_option(val=solver_options[key], name=key)
 
@@ -323,12 +304,6 @@ def prepare_problem(
         solver.set_maximum_iterations(300)
     solver.set_sim_method_num_steps(1)
 
-    # solver = Solver.IPOPT()
-    # solver.set_linear_solver("ma57")
-    # solver.set_convergence_tolerance(1e-3)
-    # solver.set_hessian_approximation("limited-memory")
-    # solver.set_maximum_iterations(3000)
-    # solver.set_print_level(5)
     # ------------- #
     return problem, solver
 
@@ -429,23 +404,11 @@ def get_target(mhe, t, x_ref, markers_ref, muscles_ref, ns_mhe, markers_ratio, e
     kin_target_idx = q_target_idx if kin_data_to_track == "q" else markers_target_idx
 
     # Define target
-    # EMG target:
-    # muscle_target_reduce = np.zeros((len(muscle_track_idx), muscles_ref.shape[1]))
-    # count = 0
-    # for i in range(muscles_ref.shape[0]):
-    #     if i in muscle_track_idx:
-    #         muscle_target_reduce[count, :] = muscles_ref[i, :]
-    #         count += 1
     muscle_target = muscles_ref[:, slide_size*t: (ns_mhe + 1 + slide_size*t)] if offline else muscles_ref
 
     # Markers target:
     markers_target_thorax = markers_ref[:3, :4, slide_size*t: (ns_mhe + 1 + slide_size*t)] if offline else markers_ref[:3, :4, :]
     markers_target_bodies = markers_ref[:3, 4:, slide_size*t: (ns_mhe + 1 + slide_size*t)] if offline else markers_ref[:3, 4:, :]
-    # print(markers_target.shape)
-    # for i in range(markers_target.shape[2]):
-    #     for j in range(markers_target.shape[1]):
-    #         if np.product(markers_target[:3, j, i]) == 0:
-    #             markers_target[:3, j, i] = markers_ref[:3, j, i - 1]
 
     # Angle target:
     q_target = x_ref[:, slide_size*t: (ns_mhe + 1 + slide_size*t)] if offline else x_ref
@@ -457,8 +420,7 @@ def get_target(mhe, t, x_ref, markers_ref, muscles_ref, ns_mhe, markers_ratio, e
         kin_target_thorax = markers_target_thorax
         kin_target_bodies = markers_target_bodies
         kin_target = [kin_target_thorax, kin_target_bodies]
-    # print(kin_target)
-    # print(kin_target_idx)
+
     target = {"kin_target": [kin_target_idx, kin_target]}
     if track_emg:
         target["muscle_target"] = [muscles_target_idx, muscle_target]
@@ -521,7 +483,6 @@ def update_mhe(mhe, t, sol, estimator_instance, muscle_track_idx, initial_time, 
         muscles_target = f_mus(x_new)
     else:
         markers_ref = markers_target
-    # muscles_ref = muscles_target
     muscles_ref = np.zeros((len(estimator_instance.muscle_track_idx), int(muscles_target.shape[1])))
     muscles_ref[[0, 1, 2], :] = muscles_target[0, :]
     muscles_ref[[3], :] = muscles_target[1, :]
@@ -557,12 +518,6 @@ def update_mhe(mhe, t, sol, estimator_instance, muscle_track_idx, initial_time, 
     else:
         mhe.x_ref = x_ref
         mhe.muscles_ref = muscles_ref
-    # if t != 0:
-    #     import matplotlib.pyplot as plt
-    #     plt.figure()
-    #     # plt.plot(muscles_ref.T)
-    #     plt.plot(mhe.muscles_ref.T)
-    #     plt.show()
 
     for key in target.keys():
         if isinstance(target[key][1], list):
@@ -579,11 +534,7 @@ def update_mhe(mhe, t, sol, estimator_instance, muscle_track_idx, initial_time, 
         force_est, q_est, dq_est, a_est, u_est = compute_force(
             sol, estimator_instance.get_force, estimator_instance.nbMT, estimator_instance.use_excitation
         )
-        # import matplotlib.pyplot as plt
-        # plt.plot(sol.states["q"][0, :], 'o')
-        # plt.plot(target["kin_target"][1][0, :], 'x')
-        # plt.plot(x_ref[:, ::estimator_instance.rt_ratio][0, t:estimator_instance.ns_mhe + t + 1])
-        # plt.show()
+
         if estimator_instance.data_to_show:
             dic_to_put = {"t": t, "force_est": force_est.tolist(), "q_est": q_est.tolist()}
             try:
@@ -621,13 +572,6 @@ def update_mhe(mhe, t, sol, estimator_instance, muscle_track_idx, initial_time, 
                     kin_target.append(target["kin_target"][1][:, :, -2:-1])
 
             data_to_save["kin_target"] = kin_target
-            # time_to_get_data = time() - tic
-            # time_to_solve = sol.real_time_to_optimize
-            # print(sol.real_time_to_optimize)
-            # print(time_to_get_data)
-            # time_tot = time_to_solve + time_to_get_data
-            # print(time_tot
-            #       )
             data_to_save["sol_freq"] = 1 / time_tot
             data_to_save["exp_freq"] = estimator_instance.exp_freq
             data_to_save["sleep_time"] = (1 / estimator_instance.exp_freq) - time_tot
@@ -668,8 +612,6 @@ class CustomMhe(MovingHorizonEstimator):
         self.x_ref = []
         self.muscles_ref = []
         self.slide_size = 0
-        # self.muscles_target = []
-        # self.kin_target = []
 
         super(CustomMhe, self).__init__(**kwargs)
 
@@ -678,17 +620,9 @@ class CustomMhe(MovingHorizonEstimator):
         u = sol.controls["all"][:, :-1]
         if self.init_w_kalman:
             x0 = np.hstack((x[:, self.slide_size:], self.x_ref[:, -self.slide_size:]))
-            # x0 = self.x_ref[:, :]
         else:
             x0 = np.hstack((x[:, self.slide_size:], x[:, -self.slide_size:]))  # discard oldest estimate of the window, duplicates youngest
         u0 = np.hstack((u[:, self.slide_size:], u[:, -self.slide_size:]))
-        # print(u.shape)
-        # print(x.shape)
-        # if sol.status != 0 and sol.status != 2:
-        #     x0[:int(x.shape[0]/2), :] = self.x_ref[:int(x.shape[0]/2), -x0.shape[1]:]
-        #     u0[int(x.shape[0]/2):, :] = self.muscles_ref[:, -u0.shape[1]:]
-
-        # u0 = self.muscles_ref
         x_init = InitialGuess(x0, interpolation=InterpolationType.EACH_FRAME)
         u_init = InitialGuess(u0, interpolation=InterpolationType.EACH_FRAME)
         self.update_initial_guess(x_init, u_init)

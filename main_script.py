@@ -468,6 +468,7 @@ if __name__ == "__main__":
                 mvc[7],
                 mvc[8],
                 mvc[9]]
+
     offline_path = data_dir + f'test_abd{scal}'
     # abd fonctionne avec t = 0.1 interpol=3 et freq =15 flex aussi
     result_dir = data_dir
@@ -496,17 +497,7 @@ if __name__ == "__main__":
                              3,  # TRAPinf
                              27  # Lat
                              ],
-        # 'muscle_track_idx': [13, 24, 25,  # PEC
-        #                      12,  # DA
-        #                      14,  # DM
-        #                      20,  # DP
-        #                      22, 23,  # bic
-        #                      27, 28, 29,  # tri
-        #                      9,  # TRAPsup
-        #                      1,  # TRAPmed
-        #                      2,  # TRAPinf
-        #                      26  # Lat
-        #                      ],
+
         "result_dir": result_dir,
         "is_mhe": is_mhe,
         "ns_full": 400,

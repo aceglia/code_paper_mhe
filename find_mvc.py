@@ -9,7 +9,7 @@ if __name__ == "__main__":
     file_dir = "/home/amedeo/Documents/programmation/code_paper_mhe/data/test_14_01_22/Clara/"
     server_ip = "192.168.1.211"
     device_host = "192.168.1.211"
-    muscle_names = ["pec", "DA", "DM", "DP", "bic", "tri", "Trap_sup", "trap_med", "trap_inf", "lat"]
+    muscle_names = ["pec", "DA", "DM", "DP", "bic", "tri", "trap_sup", "trap_med", "trap_inf", "lat"]
     # Run MVC
     muscles_idx = (0, n_electrode - 1)
     MVC = ComputeMvc(
