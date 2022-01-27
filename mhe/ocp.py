@@ -4,6 +4,7 @@ import biorbd_casadi as biorbd
 from scipy import interpolate
 from biosiglive.data_processing import read_data
 import numpy as np
+import datetime
 import scipy.io as sio
 from casadi import MX, Function
 from bioptim import (
@@ -456,6 +457,17 @@ def update_mhe(mhe, t, sol, estimator_instance, muscle_track_idx, initial_time, 
             x_ref = np.array(data["kalman"])[6:, :]
             markers_target = np.array(data["markers"])
             muscles_target = np.array(data["emg"])
+            absolute_time_frame = data["absolute_time_frame"]
+            absolute_time_reveived = datetime.datetime.now()
+            absolute_time_received_dic = {"day": absolute_time_reveived.day,
+                                          "hour": absolute_time_reveived.hour,
+                                          "minute": absolute_time_reveived.minute,
+                                          "second": absolute_time_reveived.second,
+                                          "millisecond": int(absolute_time_reveived.microsecond/1000),
+                                       }
+            absolute_delay_tcp = {}
+            for key in absolute_time_frame.keys():
+                absolute_delay_tcp[key] = absolute_time_received_dic[key] - absolute_time_frame[key]
 
     # interpolate target
     if estimator_instance.interpol_factor != 1 and estimator_instance.is_mhe:
@@ -575,6 +587,9 @@ def update_mhe(mhe, t, sol, estimator_instance, muscle_track_idx, initial_time, 
             data_to_save["sol_freq"] = 1 / time_tot
             data_to_save["exp_freq"] = estimator_instance.exp_freq
             data_to_save["sleep_time"] = (1 / estimator_instance.exp_freq) - time_tot
+            data_to_save["absolute_delay_tcp"] = absolute_delay_tcp
+            data_to_save["absolute_time_receive"] = absolute_time_received_dic
+            data_to_save["absolute_time_frame"] = absolute_time_frame
             save_results(sol,
                          data_to_save,
                          estimator_instance.current_time,
