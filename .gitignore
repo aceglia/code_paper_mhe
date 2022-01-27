@@ -5,6 +5,7 @@ __pycache__/
 
 # C extensions
 *.so
+*.json
 c_generated_code/
 data/
 live_data/

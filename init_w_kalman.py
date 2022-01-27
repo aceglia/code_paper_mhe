@@ -8,7 +8,7 @@ try:
     import opensim
 except ModuleNotFoundError:
     pass
-from models.scaling import C3DtoTRC
+import C3DtoTRC
 import csv
 from biosiglive.client import Client
 from biosiglive.server import Server
