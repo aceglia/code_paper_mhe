@@ -156,22 +156,22 @@ class MuscleForceEstimator:
             self.markers_target = markers_target
             self.x_ref = x_ref
 
-        self.muscles_target = muscles_target
-        # self.muscles_target = np.zeros(
-        #     (len(self.muscle_track_idx), int(muscles_target.shape[1])))
+        # self.muscles_target = muscles_target
+        self.muscles_target = np.zeros(
+            (len(self.muscle_track_idx), int(muscles_target.shape[1])))
         #
-        # self.muscles_target[[0, 1, 2], :] = muscles_target[0, :]
-        # self.muscles_target[[3], :] = muscles_target[1, :]
-        # self.muscles_target[4, :] = muscles_target[2, :]
-        # self.muscles_target[5, :] = muscles_target[3, :]
-        # self.muscles_target[[6, 7], :] = muscles_target[4, :]
-        # self.muscles_target[[8, 9, 10], :] = muscles_target[5, :]
-        # self.muscles_target[[11], :] = muscles_target[6, :]
-        # self.muscles_target[[12], :] = muscles_target[7, :]
-        # self.muscles_target[[13], :] = muscles_target[8, :]
-        # self.muscles_target[[14], :] = muscles_target[9, :]
-        # self.muscles_target = self.muscles_target / np.repeat(
-        #     mvc_list, muscles_target.shape[1]).reshape(len(mvc_list), muscles_target.shape[1])
+        self.muscles_target[[0, 1, 2], :] = muscles_target[0, :]
+        self.muscles_target[[3], :] = muscles_target[1, :]
+        self.muscles_target[4, :] = muscles_target[2, :]
+        self.muscles_target[5, :] = muscles_target[3, :]
+        self.muscles_target[[6, 7], :] = muscles_target[4, :]
+        self.muscles_target[[8, 9, 10], :] = muscles_target[5, :]
+        self.muscles_target[[11], :] = muscles_target[6, :]
+        self.muscles_target[[12], :] = muscles_target[7, :]
+        self.muscles_target[[13], :] = muscles_target[8, :]
+        self.muscles_target[[14], :] = muscles_target[9, :]
+        self.muscles_target = self.muscles_target / np.repeat(
+            mvc_list, muscles_target.shape[1]).reshape(len(mvc_list), muscles_target.shape[1])
 
         # self.x_ref = np.zeros((biorbd_model.nbQ(), self.ns_mhe + 1))
         # casadi funct:
@@ -455,7 +455,7 @@ if __name__ == "__main__":
     #             ]
     scaled = False
     scal = "_scaled" if scaled else ""
-    subject = f"Clara"
+    subject = f"Remi"
     data_dir = f"/home/amedeo/Documents/programmation/data_article/{subject}/"
     mvc = sio.loadmat(data_dir + "MVC.mat")["MVC_list_max"][0]
     mvc_list = [mvc[0], mvc[0], mvc[0],
@@ -468,7 +468,7 @@ if __name__ == "__main__":
                 mvc[7],
                 mvc[8],
                 mvc[9]]
-    offline_path = data_dir + f'hand_cycling'
+    offline_path = data_dir + f'test_abd{scal}'
     # abd fonctionne avec t = 0.1 interpol=3 et freq =15 flex aussi
     result_dir = data_dir
     is_mhe = True
@@ -476,7 +476,7 @@ if __name__ == "__main__":
     configuration_dic = {
         "model_path": data_dir + f"Wu_Shoulder_Model_mod_wt_wrapp_{subject}{scal}.bioMod",
         "mhe_time": 0.1,
-        "interpol_factor": 2,
+        "interpol_factor": 3,
         "use_torque": True,
         "use_excitation": False,
         "save_results": True,

@@ -8,35 +8,42 @@ import biorbd
 from biosiglive.data_processing import read_data, add_data_to_pickle
 import matplotlib.pyplot as plt
 
-# trial = "flex"
-# subject = "Clara"
-# scaled = True
-# scal = "_scaled" if scaled else ""
-# trial = "hand_cycling"
-# mat = read_data(f"/home/amedeo/Documents/programmation/data_article/{subject}/{trial}")
+subject = "Remi"
+scaled = True
+scal = "_scaled" if scaled else ""
+trial = "test_abd"
+mat = read_data(f"/home/amedeo/Documents/programmation/data_article/{subject}/{trial}")
+emg = mat["emg_proc"]
 # markers = mat["kin_target"]
+markers = mat["markers"]
 # emg = mat["muscles_target"]
-# plt.figure("Muscles")
-# # for i in muscle_track_idx:
-# # for i in range(emg.shape[0]):
-# #     plt.subplot(4, 5, i + 1)
-# #     plt.plot(emg[i, :])
-# # plt.show()
-# model_path = f"/home/amedeo/Documents/programmation/data_article/{subject}/Wu_Shoulder_Model_mod_wt_wrapp_{subject}{scal}.bioMod"
-#
-# model = biorbd.Model(model_path)
-# q_recons, _ = Server.kalman_func(markers, model=model)
-# # q_recons = mat["kalman"]
-# # b = bioviz.Viz(model_path=model_path, show_floor=False, show_muscles=True, show_gravity_vector=False)
-# # b.load_experimental_markers(markers)
-# # b.load_movement(q_recons)
-# # b.exec()
-# data_to_save = {"emg": emg, "markers": markers, "kalman": q_recons[:, :]}
-# # data_to_save = {"emg": emg, "markers": markers, "kalman": mat["kalman"]}
-# data_path = f"/home/amedeo/Documents/programmation/data_article/{subject}/{trial}{scal}"
-# if os.path.isfile(data_path):
-#     os.remove(data_path)
-# add_data_to_pickle(data_to_save, f"/home/amedeo/Documents/programmation/data_article/{subject}/{trial}{scal}")
+
+plt.figure("Muscles")
+# for i in muscle_track_idx:
+# for i in range(emg.shape[0]):
+#     plt.subplot(4, 5, i + 1)
+#     plt.plot(emg[i, :])
+# plt.show()
+model_path = f"/home/amedeo/Documents/programmation/data_article/{subject}/Wu_Shoulder_Model_mod_wt_wrapp_{subject}{scal}.bioMod"
+
+model = biorbd.Model(model_path)
+# q_recons = mat["kalman"]
+q_recons, _ = Server.kalman_func(markers, model=model)
+# print(q_recons[5, :])
+# q_recons[5, :] = q_recons[5, :] - np.pi
+# q_recons[7, :] = q_recons[7, :] + np.pi
+# q_recons = mat["kalman"]
+b = bioviz.Viz(model_path=model_path, show_floor=False, show_muscles=True, show_gravity_vector=False)
+b.load_experimental_markers(markers)
+b.load_movement(q_recons)
+b.exec()
+
+data_to_save = {"emg": emg, "markers": markers, "kalman": q_recons[:, :]}
+# data_to_save = {"emg": emg, "markers": markers, "kalman": mat["kalman"]}
+data_path = f"/home/amedeo/Documents/programmation/data_article/{subject}/{trial}{scal}"
+if os.path.isfile(data_path):
+    os.remove(data_path)
+add_data_to_pickle(data_to_save, f"/home/amedeo/Documents/programmation/data_article/{subject}/{trial}{scal}")
 
 subject = "Remi"
 # data_dir = f"test_09_12_21/{subject}/"

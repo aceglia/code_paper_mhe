@@ -9,19 +9,19 @@ import os
 from pyomeca import Markers
 import matplotlib.pyplot as plt
 use_torque = True
-animate = True
+animate = False
 import glob
 
 parent = os.path.dirname(os.getcwd())
-subject = "Jules"
+subject = "Mathis"
 result_dir = f"/home/amedeo/Documents/programmation/data_article/{subject}/"
 # files = glob.glob(result_dir + "Results_mhe_markers_EMG_act_torque_driven_**", recursive=True)
 # for file in files:
 #     mat_tmp = read_data(file)
 #     print(mat_tmp["X_est"].shape)
 #     print(mat_tmp["solver_options"][0])
-file_name = result_dir + "Results_mhe_markers_EMG_act_torque_driven_20220124-1539"
-model = biorbd.Model(result_dir + f"Wu_Shoulder_Model_mod_wt_wrapp_{subject}.bioMod")
+file_name = result_dir + "Results_mhe_markers_EMG_act_torque_driven_20220126-1103"
+model = biorbd.Model(result_dir + f"Wu_Shoulder_Model_mod_wt_wrapp_{subject}_scaled.bioMod")
 # model = biorbd.Model(parent + "/data/test_09_12_21/Jules/Wu_Shoulder_Model_mod_wt_wrapp_Jules_scaled_with_mot.bioMod")
 # c3d = parent + "/data/data_09_2021/abd.c3d"
 mat = read_data(file_name)
@@ -29,8 +29,14 @@ mat = read_data(file_name)
 nbGT = model.nbGeneralizedTorque() if use_torque is True else 0
 
 # Recons markers with kalman:
-# q_recons, q_dot = Server.kalman_func(mat["kin_target"][:, :, :], model=model)
-
+q_recons, q_dot = Server.kalman_func(mat["kin_target"][:, :, :], model=model)
+# print(q_recons[5, :])
+# q_recons[5, :] = q_recons[5, :] -2*np.pi
+# q_recons[6, :] = q_recons[6, :] -2*np.pi
+# print(q_recons[5, 0])
+# for i in range(q_recons.shape[1]):
+#     q_recons[5, i] = q_recons[5, i] - 1.5*np.pi
+#     q_recons[7, i] = q_recons[7, i] + 1.5**np.pi
 # Markers from c3d
 # markers = Markers.from_c3d(c3d).values
 # markers = markers * 0.001
@@ -40,7 +46,8 @@ if animate is True:
     b = bioviz.Viz(loaded_model=model)
     b.load_experimental_markers(mat["kin_target"])
     # b.load_experimental_markers(c3d)
-    b.load_movement(mat["X_est"][:model.nbQ(), :])
+    b.load_movement(q_recons)
+    # b.load_movement(mat["X_est"][:model.nbQ(), :])
     # b.load_movement(mat["kalman"][:model.nbQ(), :])
     b.exec()
 

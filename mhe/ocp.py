@@ -203,8 +203,8 @@ def prepare_problem(
         )
     # x_bounds[0].min[: biorbd_model.nbQ(), 0] = x0[: biorbd_model.nbQ(), 0] - 0.1
     # x_bounds[0].max[: biorbd_model.nbQ(), 0] = x0[: biorbd_model.nbQ(), 0] + 0.1
-    x_bounds[0].min[biorbd_model.nbQ():, :] = [[-10] * 3] * biorbd_model.nbQ()
-    x_bounds[0].max[biorbd_model.nbQ():, :] = [[10] * 3] * biorbd_model.nbQ()
+    x_bounds[0].min[biorbd_model.nbQ():, :] = [[-20] * 3] * biorbd_model.nbQ()
+    x_bounds[0].max[biorbd_model.nbQ():, :] = [[20] * 3] * biorbd_model.nbQ()
     # x_bounds.
     # Control path constraint
     u_bounds = BoundsList()
@@ -345,6 +345,16 @@ def configure_weights(track_emg=True, is_mhe=True, kin_data='markers', use_excit
         "min_act": 1,
         "track_emg": 100000
     }
+    # weights = {
+    #     "track_markers": 10000000,
+    #     "track_q": 100000,
+    #     "min_control": 100,
+    #     "min_dq": 100,
+    #     "min_q": 10,
+    #     "min_torque": 100,
+    #     "min_act": 1,
+    #     "track_emg": 1000
+    # }
 
     # weights = {
     #     "track_markers": 100000,
@@ -511,20 +521,20 @@ def update_mhe(mhe, t, sol, estimator_instance, muscle_track_idx, initial_time, 
         muscles_target = f_mus(x_new)
     else:
         markers_ref = markers_target
-    muscles_ref = muscles_target
-    # muscles_ref = np.zeros((len(estimator_instance.muscle_track_idx), int(muscles_target.shape[1])))
-    # muscles_ref[[0, 1, 2], :] = muscles_target[0, :]
-    # muscles_ref[[3], :] = muscles_target[1, :]
-    # muscles_ref[4, :] = muscles_target[2, :]
-    # muscles_ref[5, :] = muscles_target[3, :]
-    # muscles_ref[[6, 7], :] = muscles_target[4, :]
-    # muscles_ref[[8, 9, 10], :] = muscles_target[5, :]
-    # muscles_ref[[11], :] = muscles_target[6, :]
-    # muscles_ref[[12], :] = muscles_target[7, :]
-    # muscles_ref[[13], :] = muscles_target[8, :]
-    # muscles_ref[[14], :] = muscles_target[9, :]
-    # muscles_ref = muscles_ref / np.repeat(estimator_instance.mvc_list, muscles_target.shape[1]).reshape(
-    #     len(estimator_instance.mvc_list), muscles_target.shape[1])
+    # muscles_ref = muscles_target
+    muscles_ref = np.zeros((len(estimator_instance.muscle_track_idx), int(muscles_target.shape[1])))
+    muscles_ref[[0, 1, 2], :] = muscles_target[0, :]
+    muscles_ref[[3], :] = muscles_target[1, :]
+    muscles_ref[4, :] = muscles_target[2, :]
+    muscles_ref[5, :] = muscles_target[3, :]
+    muscles_ref[[6, 7], :] = muscles_target[4, :]
+    muscles_ref[[8, 9, 10], :] = muscles_target[5, :]
+    muscles_ref[[11], :] = muscles_target[6, :]
+    muscles_ref[[12], :] = muscles_target[7, :]
+    muscles_ref[[13], :] = muscles_target[8, :]
+    muscles_ref[[14], :] = muscles_target[9, :]
+    muscles_ref = muscles_ref / np.repeat(estimator_instance.mvc_list, muscles_target.shape[1]).reshape(
+        len(estimator_instance.mvc_list), muscles_target.shape[1])
     target = get_target(mhe,
                         t,
                         x_ref,
