@@ -63,7 +63,7 @@ def get_reference_data(file_path):
         try:
             x_ref, markers, muscles = mat['kalman'], mat["kin_target"], mat["muscles_target"]
         except:
-            x_ref, markers, muscles = mat['kalman'], mat["markers"], mat["emg_proc"]
+            x_ref, markers, muscles = mat['kalman'], mat["markers"], mat["emg"]
 
     return x_ref, markers, muscles
 
@@ -312,11 +312,11 @@ def prepare_problem(
 def configure_weights(track_emg=True, is_mhe=True, kin_data='markers', use_excitation=False):
     # Working for abd and flex
     weights = {
-        "track_markers": 1000000,
+        "track_markers": 10000000,
         "track_q": 100000,
         "min_control": 1000,
         "min_dq": 100,
-        "min_q": 100,
+        "min_q": 10,
         "min_torque": 1000,
         "min_act": 1,
         "track_emg": 100000
@@ -436,7 +436,9 @@ def update_mhe(mhe, t, sol, estimator_instance, muscle_track_idx, initial_time, 
     #     import sys
     #     sys.stdin = os.fdopen(0)
     #     input("Ready to run estimator ? (press any key to continue)")
-
+    absolute_time_frame = 0
+    absolute_delay_tcp = 0
+    absolute_time_received_dic = 0
     if estimator_instance.test_offline:
         x_ref, markers_target, muscles_target = offline_data
         t_to_stop = int(x_ref.shape[1] * estimator_instance.interpol_factor / estimator_instance.slide_size)
@@ -446,7 +448,7 @@ def update_mhe(mhe, t, sol, estimator_instance, muscle_track_idx, initial_time, 
             while True:
                 try:
                     data = estimator_instance.data_queue.get_nowait()
-                    x_ref = np.array(data["kalman"])[6:, :]
+                    x_ref = np.array(data["kalman"])
                     markers_target = np.array(data["markers"])
                     muscles_target = np.array(data["emg"])
                     break
@@ -454,16 +456,16 @@ def update_mhe(mhe, t, sol, estimator_instance, muscle_track_idx, initial_time, 
                     pass
         else:
             data = estimator_instance.get_data(t)
-            x_ref = np.array(data["kalman"])[6:, :]
+            x_ref = np.array(data["kalman"])
             markers_target = np.array(data["markers"])
             muscles_target = np.array(data["emg"])
             absolute_time_frame = data["absolute_time_frame"]
-            absolute_time_reveived = datetime.datetime.now()
-            absolute_time_received_dic = {"day": absolute_time_reveived.day,
-                                          "hour": absolute_time_reveived.hour,
-                                          "minute": absolute_time_reveived.minute,
-                                          "second": absolute_time_reveived.second,
-                                          "millisecond": int(absolute_time_reveived.microsecond/1000),
+            absolute_time_received = datetime.datetime.now()
+            absolute_time_received_dic = {"day": absolute_time_received.day,
+                                          "hour": absolute_time_received.hour,
+                                          "minute": absolute_time_received.minute,
+                                          "second": absolute_time_received.second,
+                                          "millisecond": int(absolute_time_received.microsecond/1000),
                                        }
             absolute_delay_tcp = {}
             for key in absolute_time_frame.keys():
@@ -495,6 +497,7 @@ def update_mhe(mhe, t, sol, estimator_instance, muscle_track_idx, initial_time, 
         muscles_target = f_mus(x_new)
     else:
         markers_ref = markers_target
+    # muscles_ref = muscles_target
     muscles_ref = np.zeros((len(estimator_instance.muscle_track_idx), int(muscles_target.shape[1])))
     muscles_ref[[0, 1, 2], :] = muscles_target[0, :]
     muscles_ref[[3], :] = muscles_target[1, :]
@@ -611,8 +614,8 @@ def update_mhe(mhe, t, sol, estimator_instance, muscle_track_idx, initial_time, 
         if 1 / time_tot > estimator_instance.exp_freq:
             sleep((1 / estimator_instance.exp_freq) - time_tot)
     if estimator_instance.test_offline:
-        if t == t_to_stop - 1:
-        # if stat != -1:
+        # if t == t_to_stop - 1:
+        if t == 400:
             return False
         else:
             return True

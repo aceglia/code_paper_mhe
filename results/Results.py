@@ -9,19 +9,21 @@ import os
 from pyomeca import Markers
 import matplotlib.pyplot as plt
 use_torque = True
-animate = False
+animate = True
 import glob
 
 parent = os.path.dirname(os.getcwd())
-subject = "Mathis"
-result_dir = f"/home/amedeo/Documents/programmation/data_article/{subject}/"
+subject = "Clara"
+data_dir = "/home/amedeo/Documents/programmation/code_paper_mhe/data/test_27_01_22/Clara/"
+# result_dir = f"/home/amedeo/Documents/programmation/data_article/{subject}/"
+result_dir = f"/home/amedeo/Documents/programmation/code_paper_mhe/results/{subject}/"
 # files = glob.glob(result_dir + "Results_mhe_markers_EMG_act_torque_driven_**", recursive=True)
 # for file in files:
 #     mat_tmp = read_data(file)
 #     print(mat_tmp["X_est"].shape)
 #     print(mat_tmp["solver_options"][0])
-file_name = result_dir + "Results_mhe_markers_EMG_act_torque_driven_20220126-1103"
-model = biorbd.Model(result_dir + f"Wu_Shoulder_Model_mod_wt_wrapp_{subject}_scaled.bioMod")
+file_name = result_dir + "Results_mhe_markers_EMG_act_torque_driven_20220127-1703"
+model = biorbd.Model(data_dir + f"Wu_Shoulder_Model_mod_wt_wrapp_{subject}.bioMod")
 # model = biorbd.Model(parent + "/data/test_09_12_21/Jules/Wu_Shoulder_Model_mod_wt_wrapp_Jules_scaled_with_mot.bioMod")
 # c3d = parent + "/data/data_09_2021/abd.c3d"
 mat = read_data(file_name)
@@ -46,8 +48,8 @@ if animate is True:
     b = bioviz.Viz(loaded_model=model)
     b.load_experimental_markers(mat["kin_target"])
     # b.load_experimental_markers(c3d)
-    b.load_movement(q_recons)
-    # b.load_movement(mat["X_est"][:model.nbQ(), :])
+    # b.load_movement(q_recons)
+    b.load_movement(mat["X_est"][:model.nbQ(), :])
     # b.load_movement(mat["kalman"][:model.nbQ(), :])
     b.exec()
 
@@ -197,14 +199,14 @@ plt.figure("Q")
 for i in range(0, int(mat["X_est"].shape[0]/2)):
     plt.subplot(3, 3, i+1)
     plt.plot(mat["X_est"][i, :]*180/np.pi)
-    plt.plot(mat["kalman"][i, :]*180/np.pi, '-r')
+    # plt.plot(mat["kalman"][i, :]*180/np.pi, '-r')
 
 plt.figure("Qdot")
 for i in range(0, int(mat["X_est"].shape[0]/2)):
     plt.plot(mat["X_est"][int(mat["X_est"].shape[0]/2)+i, :])
     # if len(mat["kin_target"].shape) == 2:
     #     plt.plot(mat["kin_target"][i, :]*180/np.pi, '0')
-    # plt.plot(mat["kalman"][int(mat["X_est"].shape[0]/2)+i, :], 'x')
+    plt.plot(mat["kalman"][int(mat["X_est"].shape[0]/2)+i, :], 'x')
     # plt.plot(q_recons[i, :] * 180 / np.pi, 'x')
 
 # plt.figure("markers")

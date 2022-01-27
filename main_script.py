@@ -118,7 +118,7 @@ class MuscleForceEstimator:
                 # mvc_list=self.mvc_list
             )
             # x_ref = np.array(data["kalman"])[6:, :]
-            x_ref = np.array(data["kalman"])[:, :]
+            x_ref = np.array(data["kalman"])
             markers_target = np.array(data["markers"])
             muscles_target = np.array(data["emg"])
 
@@ -455,8 +455,9 @@ if __name__ == "__main__":
     #             ]
     scaled = False
     scal = "_scaled" if scaled else ""
-    subject = f"Remi"
-    data_dir = f"/home/amedeo/Documents/programmation/data_article/{subject}/"
+    subject = f"Clara"
+    # data_dir = f"/home/amedeo/Documents/programmation/data_article/{subject}/"
+    data_dir = f"data/test_27_01_22/{subject}/"
     mvc = sio.loadmat(data_dir + "MVC.mat")["MVC_list_max"][0]
     mvc_list = [mvc[0], mvc[0], mvc[0],
                 mvc[1],
@@ -469,13 +470,15 @@ if __name__ == "__main__":
                 mvc[8],
                 mvc[9]]
 
-    offline_path = data_dir + f'test_abd{scal}'
     # abd fonctionne avec t = 0.1 interpol=3 et freq =15 flex aussi
-    result_dir = data_dir
+    # result_dir = data_dir
+    result_dir = f"results/{subject}/"
+    offline_path = result_dir + f'test_abd{scal}'
     is_mhe = True
     optim_f_iso = False
     configuration_dic = {
         "model_path": data_dir + f"Wu_Shoulder_Model_mod_wt_wrapp_{subject}{scal}.bioMod",
+        # "model_path": "/home/amedeo/Documents/programmation/code_paper_mhe/data/test_27_01_22/Clara/Wu_Shoulder_Model_mod_wt_wrapp_Clara.bioMod",
         "mhe_time": 0.1,
         "interpol_factor": 3,
         "use_torque": True,
@@ -526,15 +529,15 @@ if __name__ == "__main__":
     }
     # data_to_show = ["force", "q"]
     data_to_show = None
-    # server_ip = "192.168.1.211"
-    server_ip = "127.0.0.1"
+    server_ip = "192.168.1.211"
+    # server_ip = "127.0.0.1"
     server_port = 50000
     MHE = MuscleForceEstimator(configuration_dic)
     MHE.run(variables_dic,
             server_ip,
             server_port,
             data_to_show,
-            test_offline=True,
+            test_offline=False,
             offline_file=offline_path,
             data_process=False  # get data in multiprocessing, use if lot of threads on computer
             )

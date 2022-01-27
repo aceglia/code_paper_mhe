@@ -6,7 +6,7 @@ if __name__ == "__main__":
 
     # set file and directory to save
     file_name = "MVC.mat"
-    file_dir = "/home/amedeo/Documents/programmation/code_paper_mhe/data/test_14_01_22/Clara/"
+    file_dir = "/home/amedeo/Documents/programmation/code_paper_mhe/data/test_27_01_22/Clara/"
     server_ip = "192.168.1.211"
     device_host = "192.168.1.211"
     muscle_names = ["pec", "DA", "DM", "DP", "bic", "tri", "trap_sup", "trap_med", "trap_inf", "lat"]

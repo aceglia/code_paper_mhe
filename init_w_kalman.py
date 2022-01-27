@@ -74,13 +74,13 @@ def EKF(model_path, scaling=False, off_line=True):
                 mark_tmp = np.array(mark_tmp).reshape((3, n_marks, 10))
                 markers = np.append(markers, mark_tmp, axis=2)
     else:
-        mat = read_data(f"/home/amedeo/Documents/programmation/data_article/{subject}/{trial}")
+        mat = read_data(f"/home/amedeo/Documents/programmation/code_paper_mhe/results/{subject}/{trial}")
         try:
-            markers = mat["kin_target"][:3, :, :20]
+            markers = mat["kin_target"][:3, :, :]
         except:
-            markers = mat["markers"][:3, :, :20]
+            markers = mat["markers"][:3, :, :]
 
-    data_dir = f"/home/amedeo/Documents/programmation/data_article/{subject}"
+    # data_dir = f"/home/amedeo/Documents/programmation/data_article/{subject}"
 
     marker_names = ['STER', 'XIPH', 'C7', 'T10', 'CLAV_SC', 'CLAV_AC',
                     'SCAP_IA', 'Acrom', 'SCAP_AA', 'EPICl', 'EPICm', 'DELT', 'ARMl', 'STYLu', 'LARM_elb',
@@ -140,10 +140,10 @@ def convert_model(in_path, out_path, viz=None):
 
 
 if __name__ == '__main__':
-    trial = "test_abd"
-    subject = "Remi"
-    data_dir = f"/home/amedeo/Documents/programmation/data_article/{subject}"
-    model_path = f"{data_dir}/Wu_Shoulder_Model_mod_wt_wrapp_{subject}.osim"
-    EKF(model_path, scaling=True, off_line=True)
+    trial = "Results_mhe_markers_EMG_act_torque_driven_20220127-1703"
+    subject = "Clara"
+    data_dir = f"/home/amedeo/Documents/programmation/code_paper_mhe/data/test_27_01_22/{subject}"
+    model_path = f"{data_dir}/Wu_Shoulder_Model_mod_wt_wrapp_{subject}.bioMod"
+    EKF(model_path, scaling=False, off_line=True)
     # convert_model(in_path=model_in, out_path=model_out, viz=True)
 
