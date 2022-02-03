@@ -25,7 +25,7 @@ def update_plot(estimator_instance, t, force_est, q_est):
         estimator_instance.count_p_f = 0
         estimator_instance.count_p_f += 1
     if estimator_instance.data_to_show.count("q") != 0:
-        estimator_instance.b.set_q(q_est[:, -1])
+        estimator_instance.b.set_q(np.array(q_est)[:, -1])
 
 
 def compute_force(sol, get_force, nbMT, use_excitation=False):

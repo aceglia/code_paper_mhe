@@ -9,7 +9,7 @@ import os
 from pyomeca import Markers
 import matplotlib.pyplot as plt
 use_torque = True
-animate = True
+animate = False
 import glob
 
 parent = os.path.dirname(os.getcwd())
@@ -22,11 +22,33 @@ result_dir = f"/home/amedeo/Documents/programmation/code_paper_mhe/results/{subj
 #     mat_tmp = read_data(file)
 #     print(mat_tmp["X_est"].shape)
 #     print(mat_tmp["solver_options"][0])
-file_name = result_dir + "Results_mhe_markers_EMG_act_torque_driven_20220127-1703"
+# model = biorbd.Model(result_dir + f"Wu_Shoulder_Model_mod_wt_wrapp_{subject}.bioMod")
+file_name = result_dir + "Results_mhe_markers_EMG_act_torque_driven_20220131-1846"
 model = biorbd.Model(data_dir + f"Wu_Shoulder_Model_mod_wt_wrapp_{subject}.bioMod")
 # model = biorbd.Model(parent + "/data/test_09_12_21/Jules/Wu_Shoulder_Model_mod_wt_wrapp_Jules_scaled_with_mot.bioMod")
 # c3d = parent + "/data/data_09_2021/abd.c3d"
 mat = read_data(file_name)
+# absolute_delay_tcp = []
+# for i in range(len(mat["absolute_time_receive"])):
+#     absolute_time_frame_dic = {"hour_s": mat["absolute_time_frame"][i]["hour"] * 3600,
+#                                "minute_s": mat["absolute_time_frame"][i]["minute"] * 60,
+#                                "second": mat["absolute_time_frame"][i]["second"],
+#                                "millisecond_s": mat["absolute_time_frame"][i]["millisecond"] * 0.001,
+#                                }
+#
+#     absolute_time_received = {"hour_s": mat["absolute_time_receive"][i]["hour"] * 3600,
+#                                "minute_s": mat["absolute_time_receive"][i]["minute"] * 60,
+#                                "second": mat["absolute_time_receive"][i]["second"],
+#                                "millisecond_s": mat["absolute_time_receive"][i]["millisecond"] * 0.001,
+#                                }
+#
+#     absolute_time_frame_s = 0
+#     absolute_time_received_s = 0
+#     for key in absolute_time_frame_dic.keys():
+#         if key == "second" or key[-1:] == "s":
+#             absolute_time_frame_s = absolute_time_frame_s + absolute_time_frame_dic[key]
+#             absolute_time_received_s = absolute_time_received_s + absolute_time_received[key]
+#     absolute_delay_tcp.append(absolute_time_frame_s - absolute_time_received_s)
 
 nbGT = model.nbGeneralizedTorque() if use_torque is True else 0
 
@@ -199,14 +221,14 @@ plt.figure("Q")
 for i in range(0, int(mat["X_est"].shape[0]/2)):
     plt.subplot(3, 3, i+1)
     plt.plot(mat["X_est"][i, :]*180/np.pi)
-    # plt.plot(mat["kalman"][i, :]*180/np.pi, '-r')
+    plt.plot(mat["kalman"][i, :]*180/np.pi, '-r')
 
 plt.figure("Qdot")
 for i in range(0, int(mat["X_est"].shape[0]/2)):
     plt.plot(mat["X_est"][int(mat["X_est"].shape[0]/2)+i, :])
     # if len(mat["kin_target"].shape) == 2:
     #     plt.plot(mat["kin_target"][i, :]*180/np.pi, '0')
-    plt.plot(mat["kalman"][int(mat["X_est"].shape[0]/2)+i, :], 'x')
+    # plt.plot(mat["kalman"][int(mat["X_est"].shape[0]/2)+i, :], 'x')
     # plt.plot(q_recons[i, :] * 180 / np.pi, 'x')
 
 # plt.figure("markers")
@@ -286,18 +308,18 @@ plt.plot(t_ref)
 
 if len(mat["kin_target"].shape) != 2:
     plt.figure("markers")
-    # from optim_funct import markers_fun
-    # get_markers = markers_fun(model)
-    # mark_est = mat["kin_target"].copy()
-    # for i in range(mat["kin_target"].shape[2]):
-    #     mark_est[:, :, i] = get_markers(mat["X_est"][:2, i])
+    markers = np.ndarray((3,mat["kin_target"].shape[1], mat["kin_target"].shape[2]))
+    for i in range(mat["kin_target"].shape[2]):
+        markers[:, :, i] = np.array([mark.to_array() for mark in model.markers(mat["X_est"][:, i])]).T
 
     for i in range(mat["kin_target"].shape[1]):
         plt.subplot(4, 4, i+1)
-        plt.plot(mat["kin_target"][0, i, :].T)#, "-r")
-        plt.plot(mat["kin_target"][1, i, :].T)#, "-r")
-        plt.plot(mat["kin_target"][2, i, :].T)#, "-r")
-        # plt.plot(mark_est[:, i, :].T, "--b")
+        plt.plot(mat["kin_target"][0, i, :].T * 1000, "-r")
+        plt.plot(mat["kin_target"][1, i, :].T* 1000, "-r")
+        plt.plot(mat["kin_target"][2, i, :].T* 1000, "-r")
+        plt.plot(markers[0, i, :].T* 1000, "--b")
+        plt.plot(markers[1, i, :].T* 1000, "--b")
+        plt.plot(markers[2, i, :].T* 1000, "--b")
 
 # # static optim
 # t = [i - mat["time"][0] for i in mat["time"]]
@@ -329,6 +351,9 @@ plt.figure("Muscles")
 # for i in muscle_track_idx:
 for i in range(model.nbMuscles()):
     plt.subplot(lin, col, i + 1)
+    if i in muscle_track_idx:
+        idx = muscle_track_idx.index(i)
+        plt.plot(mat["muscles_target"][idx, :], '-r')
     plt.plot(U_est[i, :])
     # plt.plot(activation_static_optim[i, :])
     plt.title(model.muscleNames()[i].to_string())

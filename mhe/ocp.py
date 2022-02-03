@@ -463,13 +463,20 @@ def update_mhe(mhe, t, sol, estimator_instance, muscle_track_idx, initial_time, 
             absolute_time_received = datetime.datetime.now()
             absolute_time_received_dic = {"day": absolute_time_received.day,
                                           "hour": absolute_time_received.hour,
+                                          "hour_s": absolute_time_received.hour * 3600,
                                           "minute": absolute_time_received.minute,
+                                          "minute_s": absolute_time_received.minute * 60,
                                           "second": absolute_time_received.second,
                                           "millisecond": int(absolute_time_received.microsecond/1000),
+                                          "millisecond_s": int(absolute_time_received.microsecond / 1000) * 0.001,
                                        }
-            absolute_delay_tcp = {}
+            absolute_time_frame_s = 0
+            absolute_time_received_s = 0
             for key in absolute_time_frame.keys():
-                absolute_delay_tcp[key] = absolute_time_received_dic[key] - absolute_time_frame[key]
+                if key == "second" or key[-1:] == "s":
+                    absolute_time_frame_s = absolute_time_frame_s + absolute_time_frame[key]
+                    absolute_time_received_s = absolute_time_received_s + absolute_time_received_dic[key]
+            absolute_delay_tcp = absolute_time_received_s - absolute_time_frame_s
 
     # interpolate target
     if estimator_instance.interpol_factor != 1 and estimator_instance.is_mhe:
@@ -497,20 +504,20 @@ def update_mhe(mhe, t, sol, estimator_instance, muscle_track_idx, initial_time, 
         muscles_target = f_mus(x_new)
     else:
         markers_ref = markers_target
-    # muscles_ref = muscles_target
-    muscles_ref = np.zeros((len(estimator_instance.muscle_track_idx), int(muscles_target.shape[1])))
-    muscles_ref[[0, 1, 2], :] = muscles_target[0, :]
-    muscles_ref[[3], :] = muscles_target[1, :]
-    muscles_ref[4, :] = muscles_target[2, :]
-    muscles_ref[5, :] = muscles_target[3, :]
-    muscles_ref[[6, 7], :] = muscles_target[4, :]
-    muscles_ref[[8, 9, 10], :] = muscles_target[5, :]
-    muscles_ref[[11], :] = muscles_target[6, :]
-    muscles_ref[[12], :] = muscles_target[7, :]
-    muscles_ref[[13], :] = muscles_target[8, :]
-    muscles_ref[[14], :] = muscles_target[9, :]
-    muscles_ref = muscles_ref / np.repeat(estimator_instance.mvc_list, muscles_target.shape[1]).reshape(
-        len(estimator_instance.mvc_list), muscles_target.shape[1])
+    muscles_ref = muscles_target
+    # muscles_ref = np.zeros((len(estimator_instance.muscle_track_idx), int(muscles_target.shape[1])))
+    # muscles_ref[[0, 1, 2], :] = muscles_target[0, :]
+    # muscles_ref[[3], :] = muscles_target[1, :]
+    # muscles_ref[4, :] = muscles_target[2, :]
+    # muscles_ref[5, :] = muscles_target[3, :]
+    # muscles_ref[[6, 7], :] = muscles_target[4, :]
+    # muscles_ref[[8, 9, 10], :] = muscles_target[5, :]
+    # muscles_ref[[11], :] = muscles_target[6, :]
+    # muscles_ref[[12], :] = muscles_target[7, :]
+    # muscles_ref[[13], :] = muscles_target[8, :]
+    # muscles_ref[[14], :] = muscles_target[9, :]
+    # muscles_ref = muscles_ref / np.repeat(estimator_instance.mvc_list, muscles_target.shape[1]).reshape(
+    #     len(estimator_instance.mvc_list), muscles_target.shape[1])
     target = get_target(mhe,
                         t,
                         x_ref,
@@ -613,6 +620,8 @@ def update_mhe(mhe, t, sol, estimator_instance, muscle_track_idx, initial_time, 
         time_tot = time_to_solve + current_time
         if 1 / time_tot > estimator_instance.exp_freq:
             sleep((1 / estimator_instance.exp_freq) - time_tot)
+        if sol:
+            mhe.init = True if sol.status != 0 else False
     if estimator_instance.test_offline:
         # if t == t_to_stop - 1:
         if t == 400:
@@ -630,16 +639,23 @@ class CustomMhe(MovingHorizonEstimator):
         self.x_ref = []
         self.muscles_ref = []
         self.slide_size = 0
+        self.init = False
 
         super(CustomMhe, self).__init__(**kwargs)
 
     def advance_window(self, sol, steps: int = 0, **advance_options):
         x = sol.states["all"]
         u = sol.controls["all"][:, :-1]
+        # if self.init:
+        #     x0 = np.concatenate((self.x_ref[:, -x.shape[1]:], np.zeros((int(x.shape[0]/2), x.shape[1]))))
+        #     u0 = np.array([0] * int(x.shape[0]/2) + [0.2] * (u.shape[0]-int(x.shape[0]/2)))
+        #     u0 = np.tile(u0, (u.shape[1], 1)).T
+        # else:
         if self.init_w_kalman:
             x0 = np.hstack((x[:, self.slide_size:], self.x_ref[:, -self.slide_size:]))
         else:
-            x0 = np.hstack((x[:, self.slide_size:], x[:, -self.slide_size:]))  # discard oldest estimate of the window, duplicates youngest
+            x0 = np.hstack((x[:, self.slide_size:],
+                            x[:, -self.slide_size:]))  # discard oldest estimate of the window, duplicates youngest
         u0 = np.hstack((u[:, self.slide_size:], u[:, -self.slide_size:]))
         x_init = InitialGuess(x0, interpolation=InterpolationType.EACH_FRAME)
         u_init = InitialGuess(u0, interpolation=InterpolationType.EACH_FRAME)
