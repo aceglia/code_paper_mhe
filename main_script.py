@@ -28,6 +28,7 @@ class MuscleForceEstimator:
         self.is_mhe = True
         self.test_offline = False
         self.offline_file = None
+        self.plot_delay = []
 
         # Variables of the problem
         self.exp_freq = 20
@@ -156,22 +157,22 @@ class MuscleForceEstimator:
             self.markers_target = markers_target
             self.x_ref = x_ref
 
-        self.muscles_target = muscles_target
-        # self.muscles_target = np.zeros(
-        #     (len(self.muscle_track_idx), int(muscles_target.shape[1])))
-        # #
-        # self.muscles_target[[0, 1, 2], :] = muscles_target[0, :]
-        # self.muscles_target[[3], :] = muscles_target[1, :]
-        # self.muscles_target[4, :] = muscles_target[2, :]
-        # self.muscles_target[5, :] = muscles_target[3, :]
-        # self.muscles_target[[6, 7], :] = muscles_target[4, :]
-        # self.muscles_target[[8, 9, 10], :] = muscles_target[5, :]
-        # self.muscles_target[[11], :] = muscles_target[6, :]
-        # self.muscles_target[[12], :] = muscles_target[7, :]
-        # self.muscles_target[[13], :] = muscles_target[8, :]
-        # self.muscles_target[[14], :] = muscles_target[9, :]
-        # self.muscles_target = self.muscles_target / np.repeat(
-        #     mvc_list, muscles_target.shape[1]).reshape(len(mvc_list), muscles_target.shape[1])
+        # self.muscles_target = muscles_target
+        self.muscles_target = np.zeros(
+            (len(self.muscle_track_idx), int(muscles_target.shape[1])))
+        #
+        self.muscles_target[[0, 1, 2], :] = muscles_target[0, :]
+        self.muscles_target[[3], :] = muscles_target[1, :]
+        self.muscles_target[4, :] = muscles_target[2, :]
+        self.muscles_target[5, :] = muscles_target[3, :]
+        self.muscles_target[[6, 7], :] = muscles_target[4, :]
+        self.muscles_target[[8, 9, 10], :] = muscles_target[5, :]
+        self.muscles_target[[11], :] = muscles_target[6, :]
+        self.muscles_target[[12], :] = muscles_target[7, :]
+        self.muscles_target[[13], :] = muscles_target[8, :]
+        self.muscles_target[[14], :] = muscles_target[9, :]
+        self.muscles_target = self.muscles_target / np.repeat(
+            mvc_list, muscles_target.shape[1]).reshape(len(mvc_list), muscles_target.shape[1])
 
         # self.x_ref = np.zeros((biorbd_model.nbQ(), self.ns_mhe + 1))
         # casadi funct:
@@ -267,7 +268,7 @@ class MuscleForceEstimator:
             data_to_show=None,
             test_offline=False,
             offline_file=None,
-            data_process=False
+            data_process=False,
             ):
         self.var = var
         self.server_ip = server_ip
@@ -360,8 +361,14 @@ class MuscleForceEstimator:
             except:
                 is_working = False
             if is_working:
-                # from mhe.utils import update_plot
-                update_plot(self, data["t"], data["force_est"], data["q_est"])
+                plot_delay = update_plot(self,
+                                         data["t"],
+                                         data["force_est"],
+                                         data["q_est"],
+                                         init_time=data["init_time_frame"]
+                                         )
+                dic = {"plot_delay": plot_delay}
+                save_results(dic, self.current_time, result_dir=self.result_dir, file_name_prefix="plot_delay_")
 
     def run_mhe(self, var, server_ip, server_port, data_to_show):
         self.prepare_problem_init()
@@ -455,13 +462,13 @@ if __name__ == "__main__":
     #             # 0.00045,
     #             0.00010913
     #             ]
-    scaled = False
+    scaled = True
     scal = "_scaled" if scaled else ""
     subject = f"Clara"
     data_dir = f"/home/amedeo/Documents/programmation/data_article/{subject}/"
 
     mvc = sio.loadmat(data_dir + "MVC.mat")["MVC_list_max"][0]
-    data_dir = f"results/{subject}/"
+    # data_dir = f"results/{subject}/"
     # mvc = sio.loadmat("/home/amedeo/Documents/programmation/data_article/Clara/MVC.mat")["MVC_list_max"][0]
     mvc_list = [mvc[0], mvc[0], mvc[0],
                 mvc[1],
@@ -477,12 +484,13 @@ if __name__ == "__main__":
     # abd fonctionne avec t = 0.1 interpol=3 et freq =15 flex aussi
     result_dir = data_dir
     # result_dir = f"results/{subject}/"
-    offline_path = result_dir + f'test_random{scal}'
+    offline_path = "/home/amedeo/Documents/programmation/data_article/old_data/test_27_01_22/Clara/random_scaled"
+    # offline_path = result_dir + f'test_abd{scal}'
     is_mhe = True
     optim_f_iso = False
     configuration_dic = {
-        # "model_path": data_dir + f"Wu_Shoulder_Model_mod_wt_wrapp_{subject}{scal}.bioMod",
-        "model_path": "/home/amedeo/Documents/programmation/code_paper_mhe/data/test_27_01_22/Clara/Wu_Shoulder_Model_mod_wt_wrapp_Clara.bioMod",
+        "model_path": data_dir + f"Wu_Shoulder_Model_mod_wt_wrapp_{subject}{scal}.bioMod",
+        # "model_path": "/home/amedeo/Documents/programmation/code_paper_mhe/data/test_27_01_22/Clara/Wu_Shoulder_Model_mod_wt_wrapp_Clara.bioMod",
         "mhe_time": 0.1,
         "interpol_factor": 2,
         "use_torque": True,
@@ -543,7 +551,7 @@ if __name__ == "__main__":
             data_to_show,
             test_offline=True,
             offline_file=offline_path,
-            data_process=False  # get data in multiprocessing, use if lot of threads on computer
+            data_process=False,  # get data in multiprocessing, use if lot of threads on computer
             )
     # print(sol.controls)
     # sol.animate(mesh=True)

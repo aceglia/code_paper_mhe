@@ -185,9 +185,9 @@ def prepare_problem(
     biorbd_model = biorbd.Model(model_path)
     nbGT = biorbd_model.nbGeneralizedTorque() if use_torque else 0
     nbMT = biorbd_model.nbMuscleTotal()
-    tau_min, tau_max, tau_init = -100, 100, 0
-    muscle_min, muscle_max, muscle_init = 0, 1, 0.1
-    activation_min, activation_max, activation_init = 0, 1, 0.1
+    tau_min, tau_max, tau_init = -10, 10, 0
+    muscle_min, muscle_max, muscle_init = 0, 1, 0.05
+    activation_min, activation_max, activation_init = 0, 1, 0.05
 
     # Dynamics
     dynamics = DynamicsList()
@@ -314,10 +314,10 @@ def configure_weights(track_emg=True, is_mhe=True, kin_data='markers', use_excit
     weights = {
         "track_markers": 10000000,
         "track_q": 100000,
-        "min_control": 1000,
+        "min_control": 10000,
         "min_dq": 100,
         "min_q": 10,
-        "min_torque": 1000,
+        "min_torque": 10000,
         "min_act": 1,
         "track_emg": 100000
     }
@@ -438,11 +438,26 @@ def update_mhe(mhe, t, sol, estimator_instance, muscle_track_idx, initial_time, 
     #     input("Ready to run estimator ? (press any key to continue)")
     absolute_time_frame = 0
     absolute_delay_tcp = 0
+    absolute_time_received_s = 0
     absolute_time_received_dic = 0
     if estimator_instance.test_offline:
         x_ref, markers_target, muscles_target = offline_data
         t_to_stop = int(x_ref.shape[1] * estimator_instance.interpol_factor / estimator_instance.slide_size)
-
+        absolute_time_received = datetime.datetime.now()
+        absolute_time_received_dic = {"day": absolute_time_received.day,
+                                      "hour": absolute_time_received.hour,
+                                      "hour_s": absolute_time_received.hour * 3600,
+                                      "minute": absolute_time_received.minute,
+                                      "minute_s": absolute_time_received.minute * 60,
+                                      "second": absolute_time_received.second,
+                                      "millisecond": int(absolute_time_received.microsecond / 1000),
+                                      "millisecond_s": int(absolute_time_received.microsecond / 1000) * 0.001,
+                                      }
+        absolute_time_frame_s = 0
+        absolute_time_received_s = 0
+        for key in absolute_time_received_dic .keys():
+            if key == "second" or key[-1:] == "s":
+                absolute_time_received_s = absolute_time_received_s + absolute_time_received_dic[key]
     else:
         if estimator_instance.data_process:
             while True:
@@ -460,6 +475,7 @@ def update_mhe(mhe, t, sol, estimator_instance, muscle_track_idx, initial_time, 
             markers_target = np.array(data["markers"])
             muscles_target = np.array(data["emg"])
             absolute_time_frame = data["absolute_time_frame"]
+            vicon_latency = data["vicon_latency_total"]
             absolute_time_received = datetime.datetime.now()
             absolute_time_received_dic = {"day": absolute_time_received.day,
                                           "hour": absolute_time_received.hour,
@@ -477,6 +493,7 @@ def update_mhe(mhe, t, sol, estimator_instance, muscle_track_idx, initial_time, 
                     absolute_time_frame_s = absolute_time_frame_s + absolute_time_frame[key]
                     absolute_time_received_s = absolute_time_received_s + absolute_time_received_dic[key]
             absolute_delay_tcp = absolute_time_received_s - absolute_time_frame_s
+
 
     # interpolate target
     if estimator_instance.interpol_factor != 1 and estimator_instance.is_mhe:
@@ -504,20 +521,20 @@ def update_mhe(mhe, t, sol, estimator_instance, muscle_track_idx, initial_time, 
         muscles_target = f_mus(x_new)
     else:
         markers_ref = markers_target
-    muscles_ref = muscles_target
-    # muscles_ref = np.zeros((len(estimator_instance.muscle_track_idx), int(muscles_target.shape[1])))
-    # muscles_ref[[0, 1, 2], :] = muscles_target[0, :]
-    # muscles_ref[[3], :] = muscles_target[1, :]
-    # muscles_ref[4, :] = muscles_target[2, :]
-    # muscles_ref[5, :] = muscles_target[3, :]
-    # muscles_ref[[6, 7], :] = muscles_target[4, :]
-    # muscles_ref[[8, 9, 10], :] = muscles_target[5, :]
-    # muscles_ref[[11], :] = muscles_target[6, :]
-    # muscles_ref[[12], :] = muscles_target[7, :]
-    # muscles_ref[[13], :] = muscles_target[8, :]
-    # muscles_ref[[14], :] = muscles_target[9, :]
-    # muscles_ref = muscles_ref / np.repeat(estimator_instance.mvc_list, muscles_target.shape[1]).reshape(
-    #     len(estimator_instance.mvc_list), muscles_target.shape[1])
+    # muscles_ref = muscles_target
+    muscles_ref = np.zeros((len(estimator_instance.muscle_track_idx), int(muscles_target.shape[1])))
+    muscles_ref[[0, 1, 2], :] = muscles_target[0, :]
+    muscles_ref[[3], :] = muscles_target[1, :]
+    muscles_ref[4, :] = muscles_target[2, :]
+    muscles_ref[5, :] = muscles_target[3, :]
+    muscles_ref[[6, 7], :] = muscles_target[4, :]
+    muscles_ref[[8, 9, 10], :] = muscles_target[5, :]
+    muscles_ref[[11], :] = muscles_target[6, :]
+    muscles_ref[[12], :] = muscles_target[7, :]
+    muscles_ref[[13], :] = muscles_target[8, :]
+    muscles_ref[[14], :] = muscles_target[9, :]
+    muscles_ref = muscles_ref / np.repeat(estimator_instance.mvc_list, muscles_target.shape[1]).reshape(
+        len(estimator_instance.mvc_list), muscles_target.shape[1])
     target = get_target(mhe,
                         t,
                         x_ref,
@@ -558,7 +575,8 @@ def update_mhe(mhe, t, sol, estimator_instance, muscle_track_idx, initial_time, 
         )
 
         if estimator_instance.data_to_show:
-            dic_to_put = {"t": t, "force_est": force_est.tolist(), "q_est": q_est.tolist()}
+            dic_to_put = {"t": t, "force_est": force_est.tolist(), "q_est": q_est.tolist(),
+                          "init_time_frame": absolute_time_received_s}
             try:
                 estimator_instance.plot_queue.get_nowait()
             except:
@@ -578,7 +596,7 @@ def update_mhe(mhe, t, sol, estimator_instance, muscle_track_idx, initial_time, 
                 "f_est": force_est,
                 "init_w_kalman": estimator_instance.init_w_kalman,
                 "none_conv_iter": stat,
-                "solver_options": estimator_instance.solver_options
+                "solver_options": estimator_instance.solver_options,
             }
             if t == 1:
                 data_to_save["Nmhe"] = estimator_instance.ns_mhe
@@ -592,6 +610,8 @@ def update_mhe(mhe, t, sol, estimator_instance, muscle_track_idx, initial_time, 
                                                  target["kin_target"][1][1][:, :, -2:-1]), axis=1)
                 else:
                     kin_target.append(target["kin_target"][1][:, :, -2:-1])
+            if estimator_instance.use_torque:
+                data_to_save["tau_est"] = sol.controls["tau"][:, -2:-1]
 
             data_to_save["kin_target"] = kin_target
             data_to_save["sol_freq"] = 1 / time_tot
@@ -600,8 +620,7 @@ def update_mhe(mhe, t, sol, estimator_instance, muscle_track_idx, initial_time, 
             data_to_save["absolute_delay_tcp"] = absolute_delay_tcp
             data_to_save["absolute_time_receive"] = absolute_time_received_dic
             data_to_save["absolute_time_frame"] = absolute_time_frame
-            save_results(sol,
-                         data_to_save,
+            save_results(data_to_save,
                          estimator_instance.current_time,
                          estimator_instance.kin_data_to_track,
                          estimator_instance.track_emg,

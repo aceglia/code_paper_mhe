@@ -9,7 +9,6 @@ __pycache__/
 c_generated_code/
 data/
 live_data/
-results/
 .idea
 
 # Distribution / packaging

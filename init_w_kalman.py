@@ -94,7 +94,7 @@ def EKF(model_path, scaling=False, off_line=True):
         scaling_tool = "scaling_tool.xml"
         trc_file = f'{data_dir}/anato.trc'
         C3DtoTRC.WriteTrcFromMarkersData(trc_file,
-                                         markers=markers[:3, :, :],
+                                         markers=markers[:3, :, :20],
                                          marker_names=marker_names,
                                          data_rate=100,
                                          cam_rate=100,
@@ -140,10 +140,11 @@ def convert_model(in_path, out_path, viz=None):
 
 
 if __name__ == '__main__':
-    trial = "Results_mhe_markers_EMG_act_torque_driven_20220127-1703"
+    trial = "test_abd_init"
     subject = "Clara"
     data_dir = f"/home/amedeo/Documents/programmation/code_paper_mhe/data/test_27_01_22/{subject}"
-    model_path = f"{data_dir}/Wu_Shoulder_Model_mod_wt_wrapp_{subject}.bioMod"
+    model_path = f"{data_dir}/Wu_Shoulder_Model_mod_wt_wrapp_{subject}_scaled.bioMod"
+    # model_path = f"{data_dir}/Wu_Shoulder_Model_mod_wt_wrapp_{subject}.osim"
     EKF(model_path, scaling=False, off_line=True)
     # convert_model(in_path=model_in, out_path=model_out, viz=True)
 
