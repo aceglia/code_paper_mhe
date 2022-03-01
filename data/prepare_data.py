@@ -9,18 +9,18 @@ import biorbd
 from biosiglive.data_processing import read_data, add_data_to_pickle
 import matplotlib.pyplot as plt
 
-base_dir = "/home/amedeo/Documents/programmation/code_paper_mhe/results/"
-model_dir = "/home/amedeo/Documents/programmation/code_paper_mhe/data/test_27_01_22/"
+# base_dir = "/home/amedeo/Documents/programmation/code_paper_mhe/results/"
+model_dir = "/home/amedeo/Documents/programmation/code_paper_mhe/data/test_09_02_22/"
+base_dir = model_dir
+subject = "Etienne"
 
-subject = "Clara"
-
-scaled = False
+scaled = True
 scal = "_scaled" if scaled else ""
 
-trial = "abd"
+trial = "test_anato_abd"
 
 mat = read_data(f"{base_dir}{subject}/{trial}")
-muscles_target = mat["emg"]
+muscles_target = mat["emg_proc"]
 markers_target = mat["markers"]
 # # x_ref
 # t_f = markers.shape[2] / 8
@@ -58,7 +58,7 @@ markers_target = mat["markers"]
 #
 # plt.show()
 # q_recons = mat["kalman"]
-trial = 'abd'
+trial = 'anato_abd_prepared'
 model_path = f"{model_dir}{subject}/Wu_Shoulder_Model_mod_wt_wrapp_{subject}{scal}.bioMod"
 
 model = biorbd.Model(model_path)

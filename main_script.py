@@ -65,10 +65,18 @@ class MuscleForceEstimator:
         self.interpol_factor = 1
         self.weights = {}
         self.result_dir = None
-        self.ns_full = 0
+        self.ns_full = -1
+        self.init_n = 0
+        self.final_n = -1
+        self.result_file_name = None
 
         for key in conf.keys():
             self.__dict__[key] = conf[key]
+
+        if isinstance(self.ns_full, list):
+            self.init_n = self.ns_full[0]
+            self.final_n = self.ns_full[1]
+            self.ns_full = self.final_n - self.init_n
 
         self.T_mhe = self.mhe_time
         self.ns_mhe = int(self.T_mhe * self.markers_rate * self.interpol_factor)
@@ -104,6 +112,8 @@ class MuscleForceEstimator:
         from scipy import interpolate
         if self.test_offline:
             x_ref, markers_target, muscles_target = get_reference_data(self.offline_file)
+            x_ref, markers_target, muscles_target = x_ref[:, self.init_n:self.final_n], markers_target[:, :, self.init_n:self.final_n], muscles_target[:,
+                                                                                                self.init_n:self.final_n]
             self.offline_data = [x_ref, markers_target, muscles_target]
         else:
             nb_of_data = self.ns_mhe + 1  # if t == 0 else 2
@@ -127,8 +137,10 @@ class MuscleForceEstimator:
             x_ref = x_ref[6:, :]
             if self.offline_data:
                 self.offline_data[0] = x_ref
+        if self.ns_full == -1:
+            self.ns_full = x_ref.shape[1] - 1
 
-        window_len = self.ns_mhe if self.is_mhe else self.ns_full
+        window_len = self.ns_mhe if self.is_mhe else self.ns_full-1
         window_duration = self.T_mhe if self.is_mhe else window_len / self.markers_rate
         # interpolate target
         if self.interpol_factor != 1 and self.is_mhe:
@@ -365,7 +377,7 @@ class MuscleForceEstimator:
                                          data["t"],
                                          data["force_est"],
                                          data["q_est"],
-                                         init_time=data["init_time_frame"]
+                                         init_time=data["init_time_frame"],
                                          )
                 dic = {"plot_delay": plot_delay}
                 save_results(dic, self.current_time, result_dir=self.result_dir, file_name_prefix="plot_delay_")
@@ -420,6 +432,8 @@ class MuscleForceEstimator:
                     kin_target = self.x_ref[:, :self.ns_full]
                 else:
                     kin_target = self.markers_target[:, :, :self.ns_full]
+                if self.use_torque:
+                    data_to_save["tau_est"] = final_sol.controls["tau"]
 
                 data_to_save["kin_target"] = kin_target
                 data_to_save["sol_freq"] = 1 / data_to_save["time"]
@@ -427,15 +441,17 @@ class MuscleForceEstimator:
                 data_to_save["sleep_time"] = (1 / self.exp_freq) - data_to_save["time"]
                 if "p_iso" in final_sol.parameters.keys():
                     data_to_save["p_iso"] = final_sol.parameters["p_iso"]
-                save_results(final_sol,
-                             data_to_save,
+                save_results(data_to_save,
                              self.current_time,
                              self.kin_data_to_track,
                              self.track_emg,
                              self.use_torque,
                              self.use_excitation,
                              self.result_dir,
-                             is_mhe=self.is_mhe)
+                             file_name=self.result_file_name,
+                             is_mhe=self.is_mhe,
+                             file_name_prefix="full_"
+                             )
                 print("result saved")
 
 
@@ -462,12 +478,23 @@ if __name__ == "__main__":
     #             # 0.00045,
     #             0.00010913
     #             ]
+    # mvc_list = [0.00011193,0.00011193,0.00011193,
+    #  0.00195273,
+    #  0.0004393,
+    #  0.00044208,
+    #  0.00081404,0.00081404,
+    #  0.00019145,0.00019145,0.00019145,
+    #  0.00448458,
+    #  0.00171529,
+    #  0.00134165,
+    #  0.00020328]
+
     scaled = True
     scal = "_scaled" if scaled else ""
-    subject = f"Clara"
+    subject = f"Etienne"
     data_dir = f"/home/amedeo/Documents/programmation/data_article/{subject}/"
 
-    mvc = sio.loadmat(data_dir + "MVC.mat")["MVC_list_max"][0]
+    mvc = sio.loadmat(data_dir + f"MVC_{subject}.mat")["MVC_list_max"][0]
     # data_dir = f"results/{subject}/"
     # mvc = sio.loadmat("/home/amedeo/Documents/programmation/data_article/Clara/MVC.mat")["MVC_list_max"][0]
     mvc_list = [mvc[0], mvc[0], mvc[0],
@@ -479,21 +506,23 @@ if __name__ == "__main__":
                 mvc[6],
                 mvc[7],
                 mvc[8],
-                mvc[9]]
+                mvc[9]
+                ]
 
     # abd fonctionne avec t = 0.1 interpol=3 et freq =15 flex aussi
     result_dir = data_dir
     # result_dir = f"results/{subject}/"
-    offline_path = "/home/amedeo/Documents/programmation/data_article/old_data/test_27_01_22/Clara/random_scaled"
-    # offline_path = result_dir + f'test_abd{scal}'
-    is_mhe = True
+    # offline_path = "/home/amedeo/Documents/programmation/data_article/old_data/test_27_01_22/Clara/random_scaled"
+    offline_path = result_dir + f'abd_cocon'
+    file_name = "abd_cocon" + "_result"
+    is_mhe = False
     optim_f_iso = False
     configuration_dic = {
         "model_path": data_dir + f"Wu_Shoulder_Model_mod_wt_wrapp_{subject}{scal}.bioMod",
         # "model_path": "/home/amedeo/Documents/programmation/code_paper_mhe/data/test_27_01_22/Clara/Wu_Shoulder_Model_mod_wt_wrapp_Clara.bioMod",
         "mhe_time": 0.1,
         "interpol_factor": 2,
-        "use_torque": True,
+        "use_torque": False,
         "use_excitation": False,
         "save_results": True,
         "track_emg": True,
@@ -514,15 +543,17 @@ if __name__ == "__main__":
                              ],
 
         "result_dir": result_dir,
+        "result_file_name": file_name,
         "is_mhe": is_mhe,
-        "ns_full": 400,
+        # "ns_full": [432, -1],
+
         "solver_options": {"sim_method_jac_reuse": 1,
                            "nlp_solver_step_length": 0.5,
                            "levenberg_marquardt": 100.0}
     }
 
     if configuration_dic["kin_data_to_track"] == 'markers':
-        configuration_dic["exp_freq"] = 15
+        configuration_dic["exp_freq"] = 32
     else:
         configuration_dic["exp_freq"] = 20
     weights = configure_weights(track_emg=configuration_dic["track_emg"],
@@ -539,10 +570,10 @@ if __name__ == "__main__":
         "plot_q_freq": 20,
         "print_lvl": 1,
     }
-    # data_to_show = ["force", "q"]
+    # data_to_show = ["force"]#, "q"]
     data_to_show = None
-    server_ip = "192.168.1.211"
-    # server_ip = "127.0.0.1"
+    # server_ip = "192.168.1.211"
+    server_ip = "127.0.0.1"
     server_port = 50000
     MHE = MuscleForceEstimator(configuration_dic)
     MHE.run(variables_dic,

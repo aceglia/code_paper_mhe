@@ -186,8 +186,8 @@ def prepare_problem(
     nbGT = biorbd_model.nbGeneralizedTorque() if use_torque else 0
     nbMT = biorbd_model.nbMuscleTotal()
     tau_min, tau_max, tau_init = -10, 10, 0
-    muscle_min, muscle_max, muscle_init = 0, 1, 0.05
-    activation_min, activation_max, activation_init = 0, 1, 0.05
+    muscle_min, muscle_max, muscle_init = 0, 1, 0.02
+    activation_min, activation_max, activation_init = 0, 1, 0.02
 
     # Dynamics
     dynamics = DynamicsList()
@@ -293,6 +293,7 @@ def prepare_problem(
 
     if is_mhe:
         solver.set_nlp_solver_type("SQP_RTI")
+        # solver.set_nlp_solver_type("SQP")
         solver.set_print_level(0)
         solver.set_maximum_iterations(50)
         for key in solver_options.keys():
@@ -300,9 +301,11 @@ def prepare_problem(
 
 
     else:
-        solver.set_nlp_solver_type("SQP_RTI")
-        solver.set_print_level(0)
+        solver.set_nlp_solver_type("SQP")
+        solver.set_print_level(1)
         solver.set_maximum_iterations(300)
+        for key in solver_options.keys():
+            solver.set_option(val=solver_options[key], name=key)
     solver.set_sim_method_num_steps(1)
 
     # ------------- #
@@ -311,81 +314,27 @@ def prepare_problem(
 
 def configure_weights(track_emg=True, is_mhe=True, kin_data='markers', use_excitation=False):
     # Working for abd and flex
-    weights = {
-        "track_markers": 10000000,
-        "track_q": 100000,
-        "min_control": 10000,
-        "min_dq": 100,
-        "min_q": 10,
-        "min_torque": 10000,
-        "min_act": 1,
-        "track_emg": 100000
-    }
     # weights = {
     #     "track_markers": 10000000,
     #     "track_q": 100000,
-    #     "min_control": 100,
+    #     "min_control": 50000,
     #     "min_dq": 100,
     #     "min_q": 10,
-    #     "min_torque": 100,
+    #     "min_torque": 10000,
     #     "min_act": 1,
-    #     "track_emg": 1000
+    #     "track_emg": 500000
     # }
-
-    # weights = {
-    #     "track_markers": 100000,
-    #     "min_control": 1000,
-    #     "min_dq": 1000,
-    #     "min_q": 10,
-    #     "min_torque": 10,
-    #     "min_act": 0.1,
-    #     "track_emg": 100
-    # }
-
-    # if is_mhe:
-    #     if not track_emg:
-    #         weights["track_markers"] = 100000
-    #         weights["min_dq"] = 100
-    #         weights["min_q"] = 10
-    #         weights["min_control"] = 1000
-    #
-    #     if kin_data == "q":
-    #         if track_emg:
-    #             weights["track_q"] = 1000000
-    #             weights["min_q"] = 10
-    #             weights["min_torque"] = 100
-    #         else:
-    #             weights["track_q"] = 100000
-    #             weights["min_dq"] = 10
-    #             weights["min_q"] = 1
-    #             weights["min_torque"] = 10
-    # else:
-    #     if track_emg:
-    #         weights["track_markers"] = 10000000
-    #         weights["min_dq"] = 10
-    #         weights["min_q"] = 1
-    #         weights["min_control"] = 1000
-    #         weights["track_emg"] = 10000
-    #         weights["min_torque"] = 10
-    #     else:
-    #         weights["track_markers"] = 1000
-    #         weights["min_dq"] = 10
-    #         weights["min_q"] = 1
-    #         weights["min_control"] = 100
-    #
-    #     if kin_data == "q":
-    #         if track_emg:
-    #             weights["track_q"] = 10000
-    #             weights["min_dq"] = 100
-    #             weights["min_q"] = 10
-    #             weights["min_torque"] = 10
-    #             weights["min_control"] = 100
-    #             weights["track_emg"] = 1000
-    #         else:
-    #             weights["track_q"] = 1000000
-    #             weights["min_dq"] = 10
-    #             weights["min_q"] = 1
-    #             weights["min_torque"] = 10
+    # full
+    weights = {
+        "track_markers": 1000000,
+        "track_q": 10000,
+        "min_control": 100,
+        "min_dq": 1,
+        "min_q": 1,
+        "min_torque": 1000,
+        "min_act": 1,
+        "track_emg": 1000
+    }
     return weights
 
 def get_target(mhe, t, x_ref, markers_ref, muscles_ref, ns_mhe, markers_ratio, emg_ratio, slide_size, track_emg, kin_data_to_track, model, muscle_track_idx, offline):
@@ -486,6 +435,7 @@ def update_mhe(mhe, t, sol, estimator_instance, muscle_track_idx, initial_time, 
                                           "millisecond": int(absolute_time_received.microsecond/1000),
                                           "millisecond_s": int(absolute_time_received.microsecond / 1000) * 0.001,
                                        }
+
             absolute_time_frame_s = 0
             absolute_time_received_s = 0
             for key in absolute_time_frame.keys():
@@ -493,7 +443,6 @@ def update_mhe(mhe, t, sol, estimator_instance, muscle_track_idx, initial_time, 
                     absolute_time_frame_s = absolute_time_frame_s + absolute_time_frame[key]
                     absolute_time_received_s = absolute_time_received_s + absolute_time_received_dic[key]
             absolute_delay_tcp = absolute_time_received_s - absolute_time_frame_s
-
 
     # interpolate target
     if estimator_instance.interpol_factor != 1 and estimator_instance.is_mhe:
@@ -626,7 +575,8 @@ def update_mhe(mhe, t, sol, estimator_instance, muscle_track_idx, initial_time, 
                          estimator_instance.track_emg,
                          estimator_instance.use_torque,
                          estimator_instance.use_excitation,
-                         estimator_instance.result_dir)
+                         estimator_instance.result_dir,
+                         file_name=estimator_instance.result_file_name)
 
             if estimator_instance.print_lvl == 1:
                 print(
@@ -643,10 +593,10 @@ def update_mhe(mhe, t, sol, estimator_instance, muscle_track_idx, initial_time, 
             mhe.init = True if sol.status != 0 else False
     if estimator_instance.test_offline:
         # if t == t_to_stop - 1:
-        if t == 400:
-            return False
-        else:
+        if target["muscle_target"][1].shape[1] >= estimator_instance.ns_mhe:
             return True
+        else:
+            return False
     else:
         return True
 

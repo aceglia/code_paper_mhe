@@ -26,7 +26,7 @@ def update_plot(estimator_instance, t, force_est, q_est, init_time=None):
             estimator_instance.p_force,
             estimator_instance.app_force,
             estimator_instance.plot_force_ratio,
-            estimator_instance.muscle_names
+            muscle_names=estimator_instance.muscle_names
         )
         estimator_instance.count_p_f = 0
         estimator_instance.count_p_f += 1
