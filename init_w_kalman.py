@@ -16,6 +16,7 @@ from biosiglive.data_processing import read_data
 import numpy as np
 from time import sleep
 
+
 def read_sto_mot_file(filename):
     """
         Read sto or mot file from Opensim
@@ -82,24 +83,42 @@ def EKF(model_path, scaling=False, off_line=True):
 
     # data_dir = f"/home/amedeo/Documents/programmation/data_article/{subject}"
 
-    marker_names = ['STER', 'XIPH', 'C7', 'T10', 'CLAV_SC', 'CLAV_AC',
-                    'SCAP_IA', 'Acrom', 'SCAP_AA', 'EPICl', 'EPICm', 'DELT', 'ARMl', 'STYLu', 'LARM_elb',
-                    'STYLr']
+    marker_names = [
+        "STER",
+        "XIPH",
+        "C7",
+        "T10",
+        "CLAV_SC",
+        "CLAV_AC",
+        "SCAP_IA",
+        "Acrom",
+        "SCAP_AA",
+        "EPICl",
+        "EPICm",
+        "DELT",
+        "ARMl",
+        "STYLu",
+        "LARM_elb",
+        "STYLr",
+    ]
 
     if scaling:
         # ---------- model scaling ------------ #
         from pathlib import Path
+
         osim_model_path = f"{data_dir}/Wu_Shoulder_Model_mod_wt_wrapp_{subject}.osim"
-        model_output = f"{data_dir}/" + Path(osim_model_path).stem + f'_scaled.osim'
+        model_output = f"{data_dir}/" + Path(osim_model_path).stem + f"_scaled.osim"
         scaling_tool = "scaling_tool.xml"
-        trc_file = f'{data_dir}/anato.trc'
-        C3DtoTRC.WriteTrcFromMarkersData(trc_file,
-                                         markers=markers[:3, :, :20],
-                                         marker_names=marker_names,
-                                         data_rate=100,
-                                         cam_rate=100,
-                                         n_frames=markers.shape[2],
-                                         units="m").write()
+        trc_file = f"{data_dir}/anato.trc"
+        C3DtoTRC.WriteTrcFromMarkersData(
+            trc_file,
+            markers=markers[:3, :, :20],
+            marker_names=marker_names,
+            data_rate=100,
+            cam_rate=100,
+            n_frames=markers.shape[2],
+            units="m",
+        ).write()
 
         # inverse kinematics for mot file
         opensim.InverseKinematicsTool().printToXML(f"{data_dir}/inverse_kin.xml")
@@ -108,16 +127,20 @@ def EKF(model_path, scaling=False, off_line=True):
         mot_output = f"{data_dir}/ik"
         pyosim.InverseKinematics(osim_model_path, ik_input, ik_output, trc_file, mot_output)
 
-        pyosim.Scale(model_input=osim_model_path,
-                     model_output=model_output,
-                     xml_input=scaling_tool,
-                     xml_output=f'{data_dir}/scaling_tool_output.xml',
-                     static_path=trc_file,
-                     coordinate_file_name=f"{data_dir}/ik/anato.mot"
-                     )
+        pyosim.Scale(
+            model_input=osim_model_path,
+            model_output=model_output,
+            xml_input=scaling_tool,
+            xml_output=f"{data_dir}/scaling_tool_output.xml",
+            static_path=trc_file,
+            coordinate_file_name=f"{data_dir}/ik/anato.mot",
+        )
 
-        convert_model(in_path=f"{data_dir}/" + Path(model_output).stem + "_markers.osim",
-                      out_path=f"{data_dir}/" + Path(model_output).stem + '.bioMod', viz=False)
+        convert_model(
+            in_path=f"{data_dir}/" + Path(model_output).stem + "_markers.osim",
+            out_path=f"{data_dir}/" + Path(model_output).stem + ".bioMod",
+            viz=False,
+        )
 
     else:
         bmodel = biorbd.Model(model_path)
@@ -132,6 +155,7 @@ def EKF(model_path, scaling=False, off_line=True):
 def convert_model(in_path, out_path, viz=None):
     #  convert_model
     from OsimToBiomod import Converter
+
     converter = Converter(out_path, in_path)
     converter.main()
     if viz:
@@ -139,7 +163,7 @@ def convert_model(in_path, out_path, viz=None):
         b.exec()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     trial = "test_abd_init"
     subject = "Clara"
     data_dir = f"/home/amedeo/Documents/programmation/code_paper_mhe/data/test_27_01_22/{subject}"
@@ -147,4 +171,3 @@ if __name__ == '__main__':
     # model_path = f"{data_dir}/Wu_Shoulder_Model_mod_wt_wrapp_{subject}.osim"
     EKF(model_path, scaling=False, off_line=True)
     # convert_model(in_path=model_in, out_path=model_out, viz=True)
-

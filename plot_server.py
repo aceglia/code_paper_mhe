@@ -10,7 +10,7 @@ Buff_size = 100000
 
 def recv_all(connection, buff_size):
     msg_len = connection.recv(4)
-    msg_len = struct.unpack('>I', msg_len)[0]
+    msg_len = struct.unpack(">I", msg_len)[0]
     data = []
     l = 0
     while l < msg_len:
@@ -22,11 +22,11 @@ def recv_all(connection, buff_size):
     return data
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     # Open server
     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    plot_server_ip = '127.0.0.1'
+    plot_server_ip = "127.0.0.1"
     plot_server_port = 50001
     server.bind((plot_server_ip, plot_server_port))
     server.listen(10)
@@ -51,16 +51,18 @@ if __name__ == '__main__':
                     p_force, win_force, app_force = init_plot_force(nbMT)
                 if data == "q":
                     import bioviz
-                    b = bioviz.Viz(model_path=model_path,
-                                   show_global_center_of_mass=False,
-                                   show_markers=True,
-                                   show_floor=False,
-                                   show_gravity_vector=False,
-                                   show_muscles=False,
-                                   show_segments_center_of_mass=False,
-                                   show_local_ref_frame=False,
-                                   show_global_ref_frame=False
-                                   )
+
+                    b = bioviz.Viz(
+                        model_path=model_path,
+                        show_global_center_of_mass=False,
+                        show_markers=True,
+                        show_floor=False,
+                        show_gravity_vector=False,
+                        show_muscles=False,
+                        show_segments_center_of_mass=False,
+                        show_local_ref_frame=False,
+                        show_global_ref_frame=False,
+                    )
 
             model = biorbd.Model(model_path)
             muscle_names = []
@@ -76,4 +78,3 @@ if __name__ == '__main__':
                 update_plot_force(force_to_plot, p_force, app_force, ratio=1, muscle_names=muscle_names)  # , box_force)
             if "q" in data_to_show:
                 b.set_q(q_est[:, -1])
-

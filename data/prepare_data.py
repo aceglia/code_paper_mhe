@@ -58,7 +58,7 @@ markers_target = mat["markers"]
 #
 # plt.show()
 # q_recons = mat["kalman"]
-trial = 'anato_abd_prepared'
+trial = "anato_abd_prepared"
 model_path = f"{model_dir}{subject}/Wu_Shoulder_Model_mod_wt_wrapp_{subject}{scal}.bioMod"
 
 model = biorbd.Model(model_path)

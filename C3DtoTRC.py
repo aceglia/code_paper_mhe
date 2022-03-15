@@ -19,22 +19,33 @@ class WriteTrc:
 
     def _prepare_trc(self):
         headers = [
-            ["PathFileType", 4,	"(X/Y/Z)", self.output_file_path],
-            ["DataRate",
-             "CameraRate",
-             "NumFrames",
-             "NumMarkers",
-             "Units",
-             "OrigDataRate",
-             "OrigDataStartFrame",
-             "OrigNumFrames"],
-            [self.data_rate,	self.cam_rate, self.n_frames, len(self.marker_names), self.units,	self.data_rate, self.start_frame, self.n_frames]
+            ["PathFileType", 4, "(X/Y/Z)", self.output_file_path],
+            [
+                "DataRate",
+                "CameraRate",
+                "NumFrames",
+                "NumMarkers",
+                "Units",
+                "OrigDataRate",
+                "OrigDataStartFrame",
+                "OrigNumFrames",
+            ],
+            [
+                self.data_rate,
+                self.cam_rate,
+                self.n_frames,
+                len(self.marker_names),
+                self.units,
+                self.data_rate,
+                self.start_frame,
+                self.n_frames,
+            ],
         ]
-        markers_row = ["Frame#", "Time", ]
+        markers_row = ["Frame#", "Time"]
         coord_row = ["", ""]
         empty_row = []
         idx = 0
-        for i in range(len(self.marker_names)*3):
+        for i in range(len(self.marker_names) * 3):
             if i % 3 == 0:
                 markers_row.append(self.marker_names[idx])
                 idx += 1
@@ -69,8 +80,8 @@ class WriteTrc:
                 for j in range(3):
                     row.append(self.markers[j, i, frame])
             headers.append(row)
-        with open(self.output_file_path, 'w', newline='') as file:
-            writer = csv.writer(file, delimiter='\t')
+        with open(self.output_file_path, "w", newline="") as file:
+            writer = csv.writer(file, delimiter="\t")
             writer.writerows(headers)
 
     def _read_c3d(self):
@@ -86,14 +97,16 @@ class WriteTrc:
 
 
 class WriteTrcFromC3d(WriteTrc):
-    def __init__(self, output_file_path,
-                 c3d_file_path,
-                 data_rate=None,
-                 cam_rate=None,
-                 n_frames=None,
-                 start_frame=1,
-                 c3d_channels=None,
-                 ):
+    def __init__(
+        self,
+        output_file_path,
+        c3d_file_path,
+        data_rate=None,
+        cam_rate=None,
+        n_frames=None,
+        start_frame=1,
+        c3d_channels=None,
+    ):
         super(WriteTrcFromC3d, self).__init__()
         self.input_file_path = c3d_file_path
         self.output_file_path = output_file_path
@@ -108,15 +121,17 @@ class WriteTrcFromC3d(WriteTrc):
 
 
 class WriteTrcFromMarkersData(WriteTrc):
-    def __init__(self, output_file_path,
-                 markers=None,
-                 marker_names=None,
-                 data_rate=None,
-                 cam_rate=None,
-                 n_frames=None,
-                 start_frame=1,
-                 units="m"
-                 ):
+    def __init__(
+        self,
+        output_file_path,
+        markers=None,
+        marker_names=None,
+        data_rate=None,
+        cam_rate=None,
+        n_frames=None,
+        start_frame=1,
+        units="m",
+    ):
         super(WriteTrcFromMarkersData, self).__init__()
         self.output_file_path = output_file_path
         self.markers = markers
@@ -132,7 +147,7 @@ class WriteTrcFromMarkersData(WriteTrc):
         self.write_trc()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     # outfile_path = "data.trc"
     # infile_path = "data.c3d"
     outfile_path = "data/test_09_12_21/Jules/abd.trc"
