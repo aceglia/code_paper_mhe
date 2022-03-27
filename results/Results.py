@@ -1,13 +1,15 @@
 import numpy as np
 from biosiglive.data_processing import read_data
 from biosiglive.server import Server
-try :
+
+try:
     import biorbd
-except :
+except:
     import biorbd_casadi as biorbd
 import os
 from pyomeca import Markers
 import matplotlib.pyplot as plt
+
 use_torque = True
 animate = False
 import glob
@@ -67,11 +69,12 @@ q_recons, q_dot = Server.kalman_func(mat["kin_target"][:, :, :], model=model)
 
 if animate is True:
     import bioviz
+
     b = bioviz.Viz(loaded_model=model)
     b.load_experimental_markers(mat["kin_target"])
     # b.load_experimental_markers(c3d)
     # b.load_movement(q_recons)
-    b.load_movement(mat["X_est"][:model.nbQ(), :])
+    b.load_movement(mat["X_est"][: model.nbQ(), :])
     # b.load_movement(mat["kalman"][:model.nbQ(), :])
     b.exec()
 
@@ -82,17 +85,23 @@ for i in range(U_est.shape[0]):
             U_est[i, k] = 0.01
 
 U_ref = mat["muscles_target"]
-muscle_track_idx = [14, 25, 26,  # PEC
-                    13,  # DA
-                    15,  # DM
-                    21,  # DP
-                    23, 24,  # bic
-                    28, 29, 30,  # tri
-                    10,  # TRAPsup
-                    2,  # TRAPmed
-                    3,  # TRAPinf
-                    27  # Lat
-                    ]
+muscle_track_idx = [
+    14,
+    25,
+    26,  # PEC
+    13,  # DA
+    15,  # DM
+    21,  # DP
+    23,
+    24,  # bic
+    28,
+    29,
+    30,  # tri
+    10,  # TRAPsup
+    2,  # TRAPmed
+    3,  # TRAPinf
+    27,  # Lat
+]
 
 # muscle_track_idx = [13, 24, 25,  # PEC
 #                      12,  # DA
@@ -107,6 +116,7 @@ muscle_track_idx = [14, 25, 26,  # PEC
 #                      ],
 force_est_tmp = np.ndarray((model.nbMuscles(), 1))
 from biosiglive.server import Server
+
 # Q, Qdot = Server.kalman_func(markers, model, True)
 muscle_force_ref = np.ndarray((model.nbMuscles(), U_est.shape[1]))
 count = 0
@@ -134,29 +144,43 @@ for i in range(U_est.shape[1]):
     for k in range(model.nbMuscles()):
         muscles_states[k].setActivation(U_est[k, i])
         biorbd_muscle.append(biorbd.DeGrooteType(model.muscle(k)))
-        biorbd_muscle[k].length(model, mat["X_est"][:model.nbQ(), i])
+        biorbd_muscle[k].length(model, mat["X_est"][: model.nbQ(), i])
         muscles_FLPE[k, i] = biorbd_muscle[k].FlPE()
         muscles_FLCE[k, i] = biorbd_muscle[k].FlCE(muscles_states[k])
-        biorbd_muscle[k].velocity(model, mat["X_est"][:model.nbQ(), i], mat["X_est"][model.nbQ():, i], True)
+        biorbd_muscle[k].velocity(model, mat["X_est"][: model.nbQ(), i], mat["X_est"][model.nbQ() :, i], True)
         muscles_FVCE[k, i] = biorbd_muscle[k].FvCE()
-        norm_length = biorbd_muscle[k].length(model, mat["X_est"][:model.nbQ(), i], True) / model.muscle(k).characteristics().optimalLength()
-        muscles_FLCE_2[k, i] = b11 * np.exp((-0.5 * ((norm_length - b21) * (norm_length - b21))) \
-                             / ((b31 + b41 * norm_length) * (b31 + b41 * norm_length))) \
-                             + b12 * np.exp((-0.5 * ((norm_length - b22) * (norm_length - b22))) \
-                             / ((b32 + b42 * norm_length) * (b32 + b42 * norm_length))) \
-                             + b13 * np.exp((-0.5 * ((norm_length - b23) * (norm_length - b23))) \
-                             / ((b33 + b43 * norm_length) * (b33 + b43 * norm_length)))
+        norm_length = (
+            biorbd_muscle[k].length(model, mat["X_est"][: model.nbQ(), i], True)
+            / model.muscle(k).characteristics().optimalLength()
+        )
+        muscles_FLCE_2[k, i] = (
+            b11
+            * np.exp(
+                (-0.5 * ((norm_length - b21) * (norm_length - b21)))
+                / ((b31 + b41 * norm_length) * (b31 + b41 * norm_length))
+            )
+            + b12
+            * np.exp(
+                (-0.5 * ((norm_length - b22) * (norm_length - b22)))
+                / ((b32 + b42 * norm_length) * (b32 + b42 * norm_length))
+            )
+            + b13
+            * np.exp(
+                (-0.5 * ((norm_length - b23) * (norm_length - b23)))
+                / ((b33 + b43 * norm_length) * (b33 + b43 * norm_length))
+            )
+        )
 
-    muscle_force_ref[:, i] = model.muscleForces(muscles_states,
-                                                mat["X_est"][:model.nbQ(), i],
-                                                mat["X_est"][model.nbQ():, i]).to_array()
+    muscle_force_ref[:, i] = model.muscleForces(
+        muscles_states, mat["X_est"][: model.nbQ(), i], mat["X_est"][model.nbQ() :, i]
+    ).to_array()
 
 muscle_length = np.zeros((model.nbMuscles(), mat["X_est"].shape[1]))
 muscle_tendon_length = np.zeros((model.nbMuscles(), mat["X_est"].shape[1]))
 for m in range(model.nbMuscles()):
     for i in range(mat["X_est"].shape[1]):
-        muscle_length[m, i] = model.muscle(m).length(model, mat["X_est"][:model.nbQ(), i])
-        muscle_tendon_length[m, i] = model.muscle(m).musculoTendonLength(model, mat["X_est"][:model.nbQ(), i])
+        muscle_length[m, i] = model.muscle(m).length(model, mat["X_est"][: model.nbQ(), i])
+        muscle_tendon_length[m, i] = model.muscle(m).musculoTendonLength(model, mat["X_est"][: model.nbQ(), i])
 import matplotlib.pyplot as plt
 
 
@@ -185,32 +209,36 @@ import matplotlib.pyplot as plt
 plt.figure("length")
 for i in range(model.nbMuscles()):
     plt.subplot(6, 6, i + 1)
-    plt.plot(muscle_length[i, :]/model.muscle(i).characteristics().optimalLength(), label="muscle length")
+    plt.plot(muscle_length[i, :] / model.muscle(i).characteristics().optimalLength(), label="muscle length")
     plt.plot(muscle_tendon_length[i, :], label="muscle tendon length")
-    plt.plot(np.repeat(model.muscle(i).characteristics().tendonSlackLength(), muscle_length.shape[1]), 'r', label="tendon slack length")
+    plt.plot(
+        np.repeat(model.muscle(i).characteristics().tendonSlackLength(), muscle_length.shape[1]),
+        "r",
+        label="tendon slack length",
+    )
     # plt.plot(np.repeat(model.muscle(i).characteristics().optimalLength(), muscle_length.shape[1]), 'b', label="optimal length")
     # for k in range(mat["X_est"].shape[1]):
     #     if force_from_act[i, k] < 0:
     #         plt.axvline(x=k, alpha=0.2)
-        # if mat["f_est"][i, k] < 0:
-        # # if muscle_force_ref[i, k] < 0:
-        #     plt.axvline(x=k, alpha=0.2)
+    # if mat["f_est"][i, k] < 0:
+    # # if muscle_force_ref[i, k] < 0:
+    #     plt.axvline(x=k, alpha=0.2)
     # plt.plot(force_est[i, :])
     plt.title(model.muscleNames()[i].to_string())
-plt.legend(labels=["muscle tendon length", "tendon slack length"], bbox_to_anchor=(2, -0.50),loc="lower left")
+plt.legend(labels=["muscle tendon length", "tendon slack length"], bbox_to_anchor=(2, -0.50), loc="lower left")
 plt.figure("muscle velocity")
 velocity = np.zeros((model.nbMuscles(), mat["X_est"].shape[1]))
 for i in range(model.nbMuscles()):
     plt.subplot(6, 6, i + 1)
     for f in range(mat["X_est"].shape[1]):
-        velocity[i, f] = model.muscle(i).velocity(model, mat["X_est"][:model.nbQ(), f], mat["X_est"][model.nbQ():, f])
+        velocity[i, f] = model.muscle(i).velocity(model, mat["X_est"][: model.nbQ(), f], mat["X_est"][model.nbQ() :, f])
     plt.plot(velocity[i, :])
     # for k in range(mat["X_est"].shape[1]):
     #     if force_from_act[i, k] < 0:
     #         plt.axvline(x=k, alpha=0.2)
-        # if mat["f_est"][i, f] < 0:
-        #     # if muscle_force_ref[i, k] < 0:
-        #     plt.axvline(x=f, alpha=0.2)
+    # if mat["f_est"][i, f] < 0:
+    #     # if muscle_force_ref[i, k] < 0:
+    #     plt.axvline(x=f, alpha=0.2)
 
 print(np.mean(mat["sol_freq"][:500]))
 print(np.std(mat["sol_freq"][:500]))
@@ -218,14 +246,14 @@ print(np.std(mat["sol_freq"][:500]))
 import matplotlib.pyplot as plt
 
 plt.figure("Q")
-for i in range(0, int(mat["X_est"].shape[0]/2)):
-    plt.subplot(3, 3, i+1)
-    plt.plot(mat["X_est"][i, :]*180/np.pi)
-    plt.plot(mat["kalman"][i, :]*180/np.pi, '-r')
+for i in range(0, int(mat["X_est"].shape[0] / 2)):
+    plt.subplot(3, 3, i + 1)
+    plt.plot(mat["X_est"][i, :] * 180 / np.pi)
+    plt.plot(mat["kalman"][i, :] * 180 / np.pi, "-r")
 
 plt.figure("Qdot")
-for i in range(0, int(mat["X_est"].shape[0]/2)):
-    plt.plot(mat["X_est"][int(mat["X_est"].shape[0]/2)+i, :])
+for i in range(0, int(mat["X_est"].shape[0] / 2)):
+    plt.plot(mat["X_est"][int(mat["X_est"].shape[0] / 2) + i, :])
     # if len(mat["kin_target"].shape) == 2:
     #     plt.plot(mat["kin_target"][i, :]*180/np.pi, '0')
     # plt.plot(mat["kalman"][int(mat["X_est"].shape[0]/2)+i, :], 'x')
@@ -235,16 +263,17 @@ for i in range(0, int(mat["X_est"].shape[0]/2)):
 # for i in range(3):
 #     plt.plot(mat["markers_target"][i, :, :].T)
 from math import ceil
+
 col = 4
-lin = ceil(model.nbMuscles()/col)
+lin = ceil(model.nbMuscles() / col)
 count = 0
 
 if "EMG" in file_name or "emg" in file_name:
     plt.figure("Muscles tracking")
     for i in muscle_track_idx:
-    # for i in range(model.nbMuscles()):
+        # for i in range(model.nbMuscles()):
         plt.subplot(lin, col, count + 1)
-        plt.plot(mat["muscles_target"][count, :], 'r')
+        plt.plot(mat["muscles_target"][count, :], "r")
         count += 1
         plt.plot(U_est[i, :])
         plt.title(model.muscleNames()[i].to_string())
@@ -264,7 +293,7 @@ if "EMG" in file_name or "emg" in file_name:
 #     Tau[:, i - 1] = model.InverseDynamics(mat["X_est"][:model.nbQ(), i], mat["X_est"][model.nbQ():, i], Qddot).to_array()
 if "tau_est" in mat.keys():
     plt.figure("torque")
-    for i in range(int(mat["X_est"].shape[0]/2)):
+    for i in range(int(mat["X_est"].shape[0] / 2)):
         plt.subplot(3, 3, i + 1)
         plt.plot(mat["tau_est"][i, :])
         # plt.plot(Tau[i, :], 'x')
@@ -275,7 +304,7 @@ X_est = mat["X_est"]
 plt.figure("damping")
 for i in range(model.nbMuscles()):
     plt.subplot(6, 6, i + 1)
-    plt.plot(np.abs(velocity[i, :])/(10 * model.muscle(i).characteristics().optimalLength()*0.1))
+    plt.plot(np.abs(velocity[i, :]) / (10 * model.muscle(i).characteristics().optimalLength() * 0.1))
     # for k in range(mat["X_est"].shape[1]):
     #     if mat["f_est"][i, k] < 0:
     #         plt.axvline(x=k, alpha=0.2)
@@ -308,18 +337,18 @@ plt.plot(t_ref)
 
 if len(mat["kin_target"].shape) != 2:
     plt.figure("markers")
-    markers = np.ndarray((3,mat["kin_target"].shape[1], mat["kin_target"].shape[2]))
+    markers = np.ndarray((3, mat["kin_target"].shape[1], mat["kin_target"].shape[2]))
     for i in range(mat["kin_target"].shape[2]):
         markers[:, :, i] = np.array([mark.to_array() for mark in model.markers(mat["X_est"][:, i])]).T
 
     for i in range(mat["kin_target"].shape[1]):
-        plt.subplot(4, 4, i+1)
+        plt.subplot(4, 4, i + 1)
         plt.plot(mat["kin_target"][0, i, :].T * 1000, "-r")
-        plt.plot(mat["kin_target"][1, i, :].T* 1000, "-r")
-        plt.plot(mat["kin_target"][2, i, :].T* 1000, "-r")
-        plt.plot(markers[0, i, :].T* 1000, "--b")
-        plt.plot(markers[1, i, :].T* 1000, "--b")
-        plt.plot(markers[2, i, :].T* 1000, "--b")
+        plt.plot(mat["kin_target"][1, i, :].T * 1000, "-r")
+        plt.plot(mat["kin_target"][2, i, :].T * 1000, "-r")
+        plt.plot(markers[0, i, :].T * 1000, "--b")
+        plt.plot(markers[1, i, :].T * 1000, "--b")
+        plt.plot(markers[2, i, :].T * 1000, "--b")
 
 # # static optim
 # t = [i - mat["time"][0] for i in mat["time"]]
@@ -353,10 +382,9 @@ for i in range(model.nbMuscles()):
     plt.subplot(lin, col, i + 1)
     if i in muscle_track_idx:
         idx = muscle_track_idx.index(i)
-        plt.plot(mat["muscles_target"][idx, :], '-r')
+        plt.plot(mat["muscles_target"][idx, :], "-r")
     plt.plot(U_est[i, :])
     # plt.plot(activation_static_optim[i, :])
     plt.title(model.muscleNames()[i].to_string())
 
 plt.show()
-

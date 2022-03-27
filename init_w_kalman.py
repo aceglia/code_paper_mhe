@@ -55,7 +55,7 @@ def read_sto_mot_file(filename):
     return data
 
 
-def EKF(model_path, scaling=False, off_line=True):
+def EKF(model_path, scaling=False, off_line=True, mass=None):
     if not off_line:
         server_ip = "192.168.1.211"
         server_port = 50000
@@ -75,7 +75,7 @@ def EKF(model_path, scaling=False, off_line=True):
                 mark_tmp = np.array(mark_tmp).reshape((3, n_marks, 10))
                 markers = np.append(markers, mark_tmp, axis=2)
     else:
-        mat = read_data(f"/home/amedeo/Documents/programmation/code_paper_mhe/results/{subject}/{trial}")
+        mat = read_data(f"{data_dir}/{trial}")
         try:
             markers = mat["kin_target"][:3, :, :]
         except:
@@ -134,6 +134,7 @@ def EKF(model_path, scaling=False, off_line=True):
             xml_output=f"{data_dir}/scaling_tool_output.xml",
             static_path=trc_file,
             coordinate_file_name=f"{data_dir}/ik/anato.mot",
+            mass=mass
         )
 
         convert_model(
@@ -164,10 +165,11 @@ def convert_model(in_path, out_path, viz=None):
 
 
 if __name__ == "__main__":
-    trial = "test_abd_init"
+    trial = "abd_test"
     subject = "Clara"
-    data_dir = f"/home/amedeo/Documents/programmation/code_paper_mhe/data/test_27_01_22/{subject}"
-    model_path = f"{data_dir}/Wu_Shoulder_Model_mod_wt_wrapp_{subject}_scaled.bioMod"
-    # model_path = f"{data_dir}/Wu_Shoulder_Model_mod_wt_wrapp_{subject}.osim"
-    EKF(model_path, scaling=False, off_line=True)
+    mass = 62
+    data_dir = f"/home/amedeo/Documents/programmation/data_article/{subject}"
+    # model_path = f"{data_dir}/Wu_Shoulder_Model_mod_wt_wrapp_{subject}_scaled.bioMod"
+    model_path = f"{data_dir}/Wu_Shoulder_Model_mod_wt_wrapp_{subject}.osim"
+    EKF(model_path, scaling=True, off_line=True, mass=mass)
     # convert_model(in_path=model_in, out_path=model_out, viz=True)

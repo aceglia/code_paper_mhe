@@ -1,3 +1,5 @@
+import os.path
+
 from biosiglive.client import Client
 import multiprocessing as mp
 from mhe.ocp import *
@@ -62,19 +64,15 @@ class MuscleForceEstimator:
         self.interpol_factor = 1
         self.weights = {}
         self.result_dir = None
-        self.ns_full = -1
+        self.ns_full = None
         self.init_n = 0
-        self.final_n = -1
+        self.final_n = None
         self.result_file_name = None
         self.markers_target, self.muscles_target, self.x_ref, self.kin_target = None, None, None, None
+        self.n_loop = 0
 
         for key in conf.keys():
             self.__dict__[key] = conf[key]
-
-        if isinstance(self.ns_full, list):
-            self.init_n = self.ns_full[0]
-            self.final_n = self.ns_full[1]
-            self.ns_full = self.final_n - self.init_n
 
         self.T_mhe = self.mhe_time
         self.ns_mhe = int(self.T_mhe * self.markers_rate * self.interpol_factor)
@@ -103,10 +101,38 @@ class MuscleForceEstimator:
         self.data_to_get.append("markers")
         self.data_to_get.append("emg")
         from scipy import interpolate
-
+        from pathlib import Path
+        u0 = None
         if self.test_offline:
             x_ref, markers_target, muscles_target = get_reference_data(self.offline_file)
+            # if self.final_n is not None or self.init_n is not None:
+            self.final_n = -1
+            x_ref, markers_target, muscles_target = (x_ref[:, self.init_n:self.final_n],
+                                                    markers_target[:, :, self.init_n:self.final_n],
+                                                    muscles_target[:, self.init_n:self.final_n])
+
             self.offline_data = [x_ref, markers_target, muscles_target]
+            if not self.is_mhe:
+                if os.path.isfile(f"{Path(self.offline_file).parent}/{Path(self.offline_file).stem}_result"):
+                    previous_sol = read_data(f"{Path(self.offline_file).parent}/{Path(self.offline_file).stem}_result")
+                    x_est = previous_sol["X_est"]
+                    u_est = previous_sol["U_est"]
+
+                    # self.x_ref = x_est
+                    u0 = u_est[:, :-1]
+                # else:
+                    # self.x_ref = np.concatenate((x_ref[:, : x_ref.shape[1]], np.zeros((x_ref.shape[0], x_ref.shape[1]))))
+                t_f = x_ref.shape[1] / 100
+                x = np.linspace(0, t_f, x_est.shape[1])
+                f_x = interpolate.interp1d(x, x_est)
+                x_new = np.linspace(0, t_f, x_ref.shape[1])
+                x_ref = f_x(x_new)
+
+                x = np.linspace(0, t_f, u0.shape[1])
+                f_mus = interpolate.interp1d(x, u0)
+                x_new = np.linspace(0, t_f, muscles_target.shape[1])
+                u0 = f_mus(x_new)
+
         else:
             nb_of_data = self.ns_mhe + 1  # if t == 0 else 2
             vicon_client = Client(self.server_ip, self.server_port, type="TCP")
@@ -123,14 +149,12 @@ class MuscleForceEstimator:
             markers_target = np.array(data["markers"])
             muscles_target = np.array(data["emg"])
 
-        if x_ref.shape[0] != biorbd_model.nbQ():
-            x_ref = x_ref[6:, :]
-            if self.offline_data:
-                self.offline_data[0] = x_ref
+        # if x_ref.shape[0] != biorbd_model.nbQ():
+        #     x_ref = x_ref[6:, :]
+        #     if self.offline_data:
+        #         self.offline_data[0] = x_ref
 
-        if self.ns_full == -1:
-            self.ns_full = x_ref.shape[1]
-
+        self.ns_full = x_ref.shape[1]
         window_len = self.ns_mhe if self.is_mhe else int((self.ns_full - 1) * self.interpol_factor)
         window_duration = self.T_mhe if self.is_mhe else (self.ns_full - 1) / self.markers_rate
 
@@ -160,12 +184,22 @@ class MuscleForceEstimator:
 
         # Distribute muscle target to fit EMG recording
         self.muscles_target = np.zeros((len(self.muscle_track_idx), int(muscles_target.shape[1])))
+        # self.muscles_target[[0, 1, 2], :] = muscles_target[0, :]
+        # self.muscles_target[[3], :] = muscles_target[1, :]
+        # self.muscles_target[4, :] = muscles_target[2, :]
+        # self.muscles_target[5, :] = muscles_target[3, :]
+        # self.muscles_target[[6, 7], :] = muscles_target[4, :]
+        # self.muscles_target[[8, 9, 10], :] = muscles_target[5, :]
+        # self.muscles_target[[11], :] = muscles_target[6, :]
+        # self.muscles_target[[12], :] = muscles_target[7, :]
+        # self.muscles_target[[13], :] = muscles_target[8, :]
+        # self.muscles_target[[14], :] = muscles_target[9, :]
         self.muscles_target[[0, 1, 2], :] = muscles_target[0, :]
         self.muscles_target[[3], :] = muscles_target[1, :]
         self.muscles_target[4, :] = muscles_target[2, :]
-        self.muscles_target[5, :] = muscles_target[3, :]
-        self.muscles_target[[6, 7], :] = muscles_target[4, :]
-        self.muscles_target[[8, 9, 10], :] = muscles_target[5, :]
+        self.muscles_target[[5, 6], :] = muscles_target[3, :]
+        self.muscles_target[[7, 8, 9], :] = muscles_target[4, :]
+        self.muscles_target[[10], :] = muscles_target[5, :]
         self.muscles_target[[11], :] = muscles_target[6, :]
         self.muscles_target[[12], :] = muscles_target[7, :]
         self.muscles_target[[13], :] = muscles_target[8, :]
@@ -175,13 +209,18 @@ class MuscleForceEstimator:
         )
 
         self.muscles_target = self.muscles_target[:, :window_len]
-        u0 = np.zeros((biorbd_model.nbMuscles() + biorbd_model.nbQ(), window_len)) * 0.2
-        c = 0
-        for i in range(biorbd_model.nbQ(), biorbd_model.nbMuscles() + biorbd_model.nbQ()):
-            if c in self.muscle_track_idx:
-                idx = self.muscle_track_idx.index(c)
-                u0[c, :] = self.muscles_target[idx, :]
-                c += 1
+        if self.use_torque:
+            nbGT = biorbd_model.nbQ()
+        else:
+            nbGT = 0
+        if u0 is None:
+            u0 = np.zeros((biorbd_model.nbMuscles() + nbGT, window_len)) * 0.1
+            c = 0
+            for i in range(biorbd_model.nbQ(), biorbd_model.nbMuscles() + nbGT):
+                if c in self.muscle_track_idx:
+                    idx = self.muscle_track_idx.index(c)
+                    u0[c, :] = self.muscles_target[idx, :]
+                    c += 1
 
         self.kin_target = (
             self.markers_target[:, :, : window_len + 1]
@@ -195,6 +234,9 @@ class MuscleForceEstimator:
         self.dof_names = []
         for i in range(biorbd_model.nbQ()):
             self.dof_names.append(biorbd_model.nameDof()[i].to_string())
+
+        # Warm start for the full ocp
+
 
         objectives = define_objective(
             weights=self.weights,
@@ -220,7 +262,7 @@ class MuscleForceEstimator:
             is_mhe=self.is_mhe,
             use_parameters=self.use_parameters,
             solver_options=self.solver_options,
-            use_acados=False,
+            use_acados=True,
         )
 
         if not self.is_mhe:
@@ -307,10 +349,10 @@ class MuscleForceEstimator:
                 save_results(dic, self.current_time, result_dir=self.result_dir, file_name_prefix="plot_delay_")
 
     def run_mhe(self, var, data_to_show):
+        n_loop = self.n_loop
         self.prepare_problem_init()
         if data_to_show:
             self.plot_event.wait()
-
         for key in var.keys():
             if key in self.__dict__:
                 self.__setattr__(key, var[key])
@@ -340,57 +382,68 @@ class MuscleForceEstimator:
             add_data_to_pickle(data_to_save, f"{self.result_dir}/{self.result_file_name}")
             # final_sol.graphs()
         else:
-            final_sol = self.ocp.solve(solver=self.solver)
-            print(final_sol.status)
-            if "p_iso" in final_sol.parameters.keys():
-                print(final_sol.parameters["p_iso"])
-            if self.save_results:
-                data_to_save = {
-                    "time": time() - initial_time,
-                    "X_est": final_sol.states["all"],
-                    "U_est": final_sol.controls["muscles"],
-                    "kalman": self.x_ref[:, :],
-                    "init_w_kalman": self.init_w_kalman,
-                    "none_conv_iter": final_sol.status,
-                    "Nmhe": self.ns_full,
-                    "muscles_target": self.muscles_target[:, :]
-                    if self.track_emg
-                    else np.zeros((len(self.muscle_track_idx), self.ns_full)),
-                }
-                if self.kin_data_to_track == "q":
-                    kin_target = self.x_ref[:, :]
-                else:
-                    kin_target = self.markers_target[:, :, :]
-                if self.use_torque:
-                    data_to_save["tau_est"] = final_sol.controls["tau"]
-
-                data_to_save["kin_target"] = kin_target
-                data_to_save["sol_freq"] = 1 / data_to_save["time"]
-                data_to_save["exp_freq"] = self.exp_freq
-                data_to_save["sleep_time"] = (1 / self.exp_freq) - data_to_save["time"]
+            for i in range(n_loop):
+                final_sol = self.ocp.solve(solver=self.solver)
+                print(final_sol.status)
                 if "p_iso" in final_sol.parameters.keys():
-                    data_to_save["p_iso"] = final_sol.parameters["p_iso"]
+                    print(final_sol.parameters["p_iso"])
+                x_init = InitialGuess(final_sol.states["all"], interpolation=InterpolationType.EACH_FRAME)
+                u_init = InitialGuess(final_sol.controls["all"][:,:-1], interpolation=InterpolationType.EACH_FRAME)
+                self.ocp.update_initial_guess(x_init=x_init, u_init=u_init)
+                from pathlib import Path
+                if i != n_loop - 1:
+                    if os.path.isfile(
+                            f"{Path(self.offline_file).parent}/full_rti_{Path(self.offline_file).stem}_result"):
+                        os.remove(f"{Path(self.offline_file).parent}/full_rti_{Path(self.offline_file).stem}_result")
+                if self.save_results:
+                    data_to_save = {
+                        "time": time() - initial_time,
+                        "X_est": final_sol.states["all"],
+                        "U_est": final_sol.controls["muscles"],
+                        "kalman": self.x_ref[:, :],
+                        "init_w_kalman": self.init_w_kalman,
+                        "none_conv_iter": final_sol.status,
+                        "Nmhe": self.ns_full,
+                        "muscles_target": self.muscles_target[:, :]
+                        if self.track_emg
+                        else np.zeros((len(self.muscle_track_idx), self.ns_full)),
+                    }
+                    if self.kin_data_to_track == "q":
+                        kin_target = self.x_ref[:, :]
+                    else:
+                        kin_target = self.markers_target[:, :, :]
+                    if self.use_torque:
+                        data_to_save["tau_est"] = final_sol.controls["tau"]
 
-                sol_int = final_sol.integrate(shooting_type=Shooting.SINGLE_CONTINUOUS,
-                                    merge_phases=True,
-                                    keep_intermediate_points=False,
-                                    integrator=SolutionIntegrator.SCIPY_RK45)
-                data_to_save["q_int"] = sol_int.states["all"]
+                    data_to_save["kin_target"] = kin_target
+                    data_to_save["sol_freq"] = 1 / data_to_save["time"]
+                    data_to_save["exp_freq"] = self.exp_freq
+                    data_to_save["sleep_time"] = (1 / self.exp_freq) - data_to_save["time"]
+                    if "p_iso" in final_sol.parameters.keys():
+                        data_to_save["p_iso"] = final_sol.parameters["p_iso"]
 
-                save_results(
-                    data_to_save,
-                    self.current_time,
-                    self.kin_data_to_track,
-                    self.track_emg,
-                    self.use_torque,
-                    self.use_excitation,
-                    self.result_dir,
-                    file_name=self.result_file_name,
-                    is_mhe=self.is_mhe,
-                    file_name_prefix="full_",
-                )
-                # final_sol.graphs()
-                print("result saved")
+                    sol_int = final_sol.integrate(shooting_type=Shooting.SINGLE_CONTINUOUS,
+                                        merge_phases=True,
+                                        keep_intermediate_points=False,
+                                        integrator=SolutionIntegrator.SCIPY_RK45)
+                    data_to_save["q_int"] = sol_int.states["all"]
+
+                    file_name_prefix = "full_" if i == n_loop - 1 else "full_rti_"
+                    save_results(
+                        data_to_save,
+                        self.current_time,
+                        self.kin_data_to_track,
+                        self.track_emg,
+                        self.use_torque,
+                        self.use_excitation,
+                        self.result_dir,
+                        file_name=self.result_file_name,
+                        is_mhe=self.is_mhe,
+                        file_name_prefix=file_name_prefix,
+                    )
+                    # final_sol.graphs()
+                    print("result saved")
+
 
 
 if __name__ == "__main__":
@@ -429,7 +482,7 @@ if __name__ == "__main__":
 
     scaled = True
     scal = "_scaled" if scaled else ""
-    subject = f"Etienne"
+    subject = f"Clara"
     data_dir = f"/home/amedeo/Documents/programmation/data_article/{subject}/"
 
     mvc = sio.loadmat(data_dir + f"MVC_{subject}.mat")["MVC_list_max"][0]
@@ -451,8 +504,9 @@ if __name__ == "__main__":
         mvc[9],
     ]
     result_dir = data_dir
-    trials = ["abd_cocon_1_rep"]  # , "abd_1_rep", "flex_1_rep", "flex_cocon_1_rep"]
-    configs = ["full"]  # , "mhe"]
+    # trials = ["abd", "abd_cocon", "flex", "flex_cocon", "cycl","cycl_cocon"]  # , "abd_1_rep", "flex_1_rep", "flex_cocon_1_rep"]
+    trials = ["abd_test"]
+    configs = ["mhe"]  # , "mhe"]
     for config in configs:
         is_mhe = False if config == "full" else True
         for trial in trials:
@@ -468,9 +522,9 @@ if __name__ == "__main__":
                 interpol_factor = 2
             else:
                 solver_options = {
-                    "sim_method_jac_reuse": 1,
+                    # "sim_method_jac_reuse": 1,
                     # "nlp_solver_step_length": 0.5,
-                    # "levenberg_marquardt": 1.0,
+                    # "levenberg_marquardt": 100.0,
                                   }
                 interpol_factor = 1
 
@@ -478,7 +532,7 @@ if __name__ == "__main__":
                 "model_path": data_dir + f"Wu_Shoulder_Model_mod_wt_wrapp_{subject}{scal}.bioMod",
                 "mhe_time": 0.1,
                 "interpol_factor": interpol_factor,
-                "use_torque": True,
+                "use_torque": False,
                 "use_excitation": False,
                 "save_results": True,
                 "track_emg": True,
@@ -487,17 +541,12 @@ if __name__ == "__main__":
                 "mvc_list": mvc_list,
                 "use_parameters": optim_f_iso,
                 "muscle_track_idx": [
-                    14,
-                    25,
-                    26,  # PEC
+                    14, 25, 26,  # PEC
                     13,  # DA
                     15,  # DM
                     21,  # DP
-                    23,
-                    24,  # bic
-                    28,
-                    29,
-                    30,  # tri
+                    23, 24,  # bic
+                    28, 29, 30,  # tri
                     10,  # TRAPsup
                     2,  # TRAPmed
                     3,  # TRAPinf
@@ -506,8 +555,9 @@ if __name__ == "__main__":
                 "result_dir": result_dir,
                 "result_file_name": file_name,
                 "is_mhe": is_mhe,
-                "solver_options": solver_options
-    ,
+                "solver_options": solver_options,
+                "n_loop": 1,
+                "init_n": 100,
             }
 
             if configuration_dic["kin_data_to_track"] == "markers":

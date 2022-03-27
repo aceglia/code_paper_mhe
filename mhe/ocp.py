@@ -22,6 +22,8 @@ from bioptim import (
     Node,
     OptimalControlProgram,
     ParameterList,
+    Shooting,
+    SolutionIntegrator
 )
 
 
@@ -269,11 +271,12 @@ def prepare_problem(
         u_init = InitialGuess(np.tile(u0, (window_len, 1)).T, interpolation=InterpolationType.EACH_FRAME)
 
     else:
-        x_init = InitialGuess(
-            np.concatenate((x0[:, : window_len + 1], np.zeros((x0.shape[0], window_len + 1)))),
-            interpolation=InterpolationType.EACH_FRAME,
-        )
-        u_init = InitialGuess(u0[:, : window_len + 1], interpolation=InterpolationType.EACH_FRAME)
+        # x_init = InitialGuess(
+        #     np.concatenate((x0[:, : window_len + 1], np.zeros((x0.shape[0], window_len + 1)))),
+        #     interpolation=InterpolationType.EACH_FRAME,
+        # )
+        x_init = InitialGuess(x0, interpolation=InterpolationType.EACH_FRAME)
+        u_init = InitialGuess(u0[:, : window_len], interpolation=InterpolationType.EACH_FRAME)
 
     if use_parameters:
         nb_mus = biorbd_model.nbMuscles()
@@ -339,7 +342,8 @@ def prepare_problem(
         solver = Solver.IPOPT()
         solver.set_linear_solver("ma57")
         solver.set_print_level(5)
-        solver.set_hessian_approximation("limited-memory")
+        # solver.set_hessian_approximation("limited-memory")
+        solver.set_hessian_approximation("exact")
 
     else:
         solver = Solver.ACADOS()
@@ -358,7 +362,7 @@ def prepare_problem(
             # solver.set_nlp_solver_type("SQP_RTI")
             solver.set_nlp_solver_type("SQP")
             solver.set_print_level(1)
-            solver.set_maximum_iterations(100)
+            solver.set_maximum_iterations(300)
             for key in solver_options.keys():
                 solver.set_option(val=solver_options[key], name=key)
         solver.set_sim_method_num_steps(5)
@@ -367,7 +371,6 @@ def prepare_problem(
 
 
 def configure_weights(is_mhe=True):
-    # Working for abd and flex
     if is_mhe:
         weights = {
             "track_markers": 10000000,
@@ -382,17 +385,39 @@ def configure_weights(is_mhe=True):
         }
     # full
     else:
+        # weights = {
+        #     "track_markers": 1000000,
+        #     "track_q": 100000,
+        #     "min_control": 100,
+        #     "min_dq": 1,
+        #     "min_q": 1,
+        #     "min_torque": 100,
+        #     "min_act": 1,
+        #     "track_emg": 500,
+        #     # "min_control_tot": 0.0001,
+        # }
         weights = {
-            "track_markers": 1000000,
+            "track_markers": 10000,
             "track_q": 100000,
-            "min_control": 100,
-            "min_dq": 10,
+            "min_control": 10,
+            "min_dq": 1,
             "min_q": 1,
-            "min_torque": 100,
+            "min_torque": 10,
             "min_act": 1,
-            "track_emg": 5000,
+            "track_emg": 100,
             # "min_control_tot": 0.0001,
         }
+        # weights = {
+        #     "track_markers": 100000000,
+        #     "track_q": 100000,
+        #     "min_control": 100,
+        #     "min_dq": 0.10,
+        #     "min_q": 0.01,
+        #     "min_torque": 100,
+        #     "min_act": 1,
+        #     "track_emg": 5000000,
+        #     # "min_control_tot": 0.0001,
+        # }
         # weights = {
         #     "track_markers": 100000000,
         #     "track_q": 100000,
@@ -468,6 +493,13 @@ def update_mhe(mhe, t, sol, estimator_instance, initial_time, offline_data=None)
     tic = time()
     if sol:
         print(sol.status)
+        sol_int = sol.integrate(shooting_type=Shooting.SINGLE_CONTINUOUS,
+                                      merge_phases=True,
+                                      keep_intermediate_points=False,
+                                      # integrator=SolutionIntegrator.SCIPY_RK45
+                                )
+        q_int = sol_int.states["all"]
+        q = sol.states["all"]
 
     # target to save
     if mhe.x_ref is not None:
@@ -576,6 +608,16 @@ def update_mhe(mhe, t, sol, estimator_instance, initial_time, offline_data=None)
     muscles_ref[[12], :] = muscles_target[7, :]
     muscles_ref[[13], :] = muscles_target[8, :]
     muscles_ref[[14], :] = muscles_target[9, :]
+    # muscles_ref[[0, 1, 2], :] = muscles_target[0, :]
+    # muscles_ref[[3], :] = muscles_target[1, :]
+    # # muscles_ref[4, :] = muscles_target[2, :]
+    # muscles_ref[4, :] = muscles_target[2, :]
+    # muscles_ref[[5, 6], :] = muscles_target[3, :]
+    # muscles_ref[[7, 8, 9], :] = muscles_target[4, :]
+    # muscles_ref[[10], :] = muscles_target[5, :]
+    # muscles_ref[[11], :] = muscles_target[6, :]
+    # muscles_ref[[12], :] = muscles_target[7, :]
+    # muscles_ref[[13], :] = muscles_target[8, :]
     muscles_ref = muscles_ref / np.repeat(estimator_instance.mvc_list, muscles_target.shape[1]).reshape(
         len(estimator_instance.mvc_list), muscles_target.shape[1]
     )
@@ -665,6 +707,8 @@ def update_mhe(mhe, t, sol, estimator_instance, initial_time, offline_data=None)
                 "init_w_kalman": estimator_instance.init_w_kalman,
                 "none_conv_iter": stat,
                 "solver_options": estimator_instance.solver_options,
+                "q_int": q_int,
+                "q": q,
             }
             if t == 1:
                 data_to_save["Nmhe"] = estimator_instance.ns_mhe
