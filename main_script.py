@@ -106,7 +106,7 @@ class MuscleForceEstimator:
         if self.test_offline:
             x_ref, markers_target, muscles_target = get_reference_data(self.offline_file)
             # if self.final_n is not None or self.init_n is not None:
-            self.final_n = -1
+            self.final_n = -1 if not self.final_n else self.final_n
             x_ref, markers_target, muscles_target = (x_ref[:, self.init_n:self.final_n],
                                                     markers_target[:, :, self.init_n:self.final_n],
                                                     muscles_target[:, self.init_n:self.final_n])
@@ -123,9 +123,13 @@ class MuscleForceEstimator:
                 # else:
                     # self.x_ref = np.concatenate((x_ref[:, : x_ref.shape[1]], np.zeros((x_ref.shape[0], x_ref.shape[1]))))
                 t_f = x_ref.shape[1] / 100
+                if self.ode_solver.is_direct_collocation:
+                    n_interp = x_ref.shape[1] * (self.ode_solver.polynomial_degree + 1) - self.ode_solver.polynomial_degree
+                else:
+                    n_interp = x_ref.shape[1]
                 x = np.linspace(0, t_f, x_est.shape[1])
                 f_x = interpolate.interp1d(x, x_est)
-                x_new = np.linspace(0, t_f, x_ref.shape[1])
+                x_new = np.linspace(0, t_f, n_interp)
                 x_ref = f_x(x_new)
 
                 x = np.linspace(0, t_f, u0.shape[1])
@@ -154,7 +158,7 @@ class MuscleForceEstimator:
         #     if self.offline_data:
         #         self.offline_data[0] = x_ref
 
-        self.ns_full = x_ref.shape[1]
+        self.ns_full = muscles_target.shape[1]
         window_len = self.ns_mhe if self.is_mhe else int((self.ns_full - 1) * self.interpol_factor)
         window_duration = self.T_mhe if self.is_mhe else (self.ns_full - 1) / self.markers_rate
 
@@ -227,7 +231,9 @@ class MuscleForceEstimator:
             if self.kin_data_to_track == "markers"
             else self.x_ref[: self.nbQ, : window_len + 1]
         )
-        self.x_ref = self.x_ref[:, : window_len + 1]
+        if is_mhe:
+            self.x_ref = self.x_ref[:, : window_len + 1]
+
         for i in range(biorbd_model.nbMuscles()):
             self.muscle_names.append(biorbd_model.muscleNames()[i].to_string())
 
@@ -262,7 +268,9 @@ class MuscleForceEstimator:
             is_mhe=self.is_mhe,
             use_parameters=self.use_parameters,
             solver_options=self.solver_options,
-            use_acados=True,
+            use_acados=False,
+            ode_solver=self.ode_solver,
+            implicit_dynamics=self.implicit_dynamics,
         )
 
         if not self.is_mhe:
@@ -441,7 +449,7 @@ class MuscleForceEstimator:
                         is_mhe=self.is_mhe,
                         file_name_prefix=file_name_prefix,
                     )
-                    # final_sol.graphs()
+                    final_sol.graphs()
                     print("result saved")
 
 
@@ -482,7 +490,7 @@ if __name__ == "__main__":
 
     scaled = True
     scal = "_scaled" if scaled else ""
-    subject = f"Clara"
+    subject = f"Etienne"
     data_dir = f"/home/amedeo/Documents/programmation/data_article/{subject}/"
 
     mvc = sio.loadmat(data_dir + f"MVC_{subject}.mat")["MVC_list_max"][0]
@@ -505,8 +513,8 @@ if __name__ == "__main__":
     ]
     result_dir = data_dir
     # trials = ["abd", "abd_cocon", "flex", "flex_cocon", "cycl","cycl_cocon"]  # , "abd_1_rep", "flex_1_rep", "flex_cocon_1_rep"]
-    trials = ["abd_test"]
-    configs = ["mhe"]  # , "mhe"]
+    trials = ["abd_1_rep"]
+    configs = ["full"]  # , "mhe"]
     for config in configs:
         is_mhe = False if config == "full" else True
         for trial in trials:
@@ -557,7 +565,10 @@ if __name__ == "__main__":
                 "is_mhe": is_mhe,
                 "solver_options": solver_options,
                 "n_loop": 1,
-                "init_n": 100,
+                # "init_n": 100,
+                "final_n": 150,
+                "ode_solver": OdeSolver.COLLOCATION(),
+                "implicit_dynamics": True,
             }
 
             if configuration_dic["kin_data_to_track"] == "markers":

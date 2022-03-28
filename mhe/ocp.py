@@ -23,7 +23,8 @@ from bioptim import (
     OptimalControlProgram,
     ParameterList,
     Shooting,
-    SolutionIntegrator
+    SolutionIntegrator,
+    OdeSolver,
 )
 
 
@@ -224,6 +225,9 @@ def prepare_problem(
     use_parameters=False,
     solver_options={},
     use_acados=True,
+    ode_solver=OdeSolver.RK4(),
+    implicit_dynamics=False
+
 ):
     # Model path
 
@@ -239,7 +243,8 @@ def prepare_problem(
     dynamics.add(DynamicsFcn.MUSCLE_DRIVEN,
                  with_excitations=use_excitation,
                  with_torque=use_torque,
-                 expand=False)
+                 expand=False,
+                 implicit_dynamics=implicit_dynamics)
 
     # State path constraint
     x_bounds = BoundsList()
@@ -253,7 +258,8 @@ def prepare_problem(
     # x_bounds[0].max[biorbd_model.nbQ() :, :] = [[60] * 3] * biorbd_model.nbQ()
     # x_bounds[0].min[ :biorbd_model.nbQ(), 0] = x0[:, 0]
     # x_bounds[0].max[ :biorbd_model.nbQ(), 0] = x0[:, 0]
-
+    if implicit_dynamics :
+        nbGT = biorbd_model.nbQ()
     # Control path constraint
     u_bounds = BoundsList()
     u_bounds.add(
@@ -271,12 +277,13 @@ def prepare_problem(
         u_init = InitialGuess(np.tile(u0, (window_len, 1)).T, interpolation=InterpolationType.EACH_FRAME)
 
     else:
-        # x_init = InitialGuess(
-        #     np.concatenate((x0[:, : window_len + 1], np.zeros((x0.shape[0], window_len + 1)))),
-        #     interpolation=InterpolationType.EACH_FRAME,
-        # )
-        x_init = InitialGuess(x0, interpolation=InterpolationType.EACH_FRAME)
-        u_init = InitialGuess(u0[:, : window_len], interpolation=InterpolationType.EACH_FRAME)
+        x_init = InitialGuess(
+            np.concatenate((x0[:biorbd_model.nbQ(), :], np.zeros((biorbd_model.nbQ(), x0.shape[1])))),
+            interpolation=InterpolationType.EACH_FRAME,
+        )
+        u0 = np.concatenate((u0, np.zeros((biorbd_model.nbQ(), u0.shape[1]))))
+        # x_init = InitialGuess(x0, interpolation=InterpolationType.EACH_FRAME)
+        u_init = InitialGuess(u0[:, :-1], interpolation=InterpolationType.EACH_FRAME)
 
     if use_parameters:
         nb_mus = biorbd_model.nbMuscles()
@@ -337,6 +344,7 @@ def prepare_problem(
             phase_time=window_duration,
             parameters=parameters,
             use_sx=use_acados,
+            ode_solver=ode_solver,
         )
     if not use_acados:
         solver = Solver.IPOPT()
