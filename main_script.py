@@ -242,8 +242,6 @@ class MuscleForceEstimator:
             self.dof_names.append(biorbd_model.nameDof()[i].to_string())
 
         # Warm start for the full ocp
-
-
         objectives = define_objective(
             weights=self.weights,
             use_excitation=self.use_excitation,
@@ -268,7 +266,7 @@ class MuscleForceEstimator:
             is_mhe=self.is_mhe,
             use_parameters=self.use_parameters,
             solver_options=self.solver_options,
-            use_acados=False,
+            use_acados=True,
             ode_solver=self.ode_solver,
             implicit_dynamics=self.implicit_dynamics,
         )
@@ -305,7 +303,6 @@ class MuscleForceEstimator:
             raise RuntimeError("Please provide a data file to run offline program")
         if not self.is_mhe and not self.test_offline:
             raise RuntimeError("Online optimisation only available using MHE implementation")
-
         proc_plot = []
 
         if self.data_to_show:
@@ -490,8 +487,8 @@ if __name__ == "__main__":
 
     scaled = True
     scal = "_scaled" if scaled else ""
-    subject = f"Etienne"
-    data_dir = f"/home/amedeo/Documents/programmation/data_article/{subject}/"
+    subject = f"subject_2"
+    data_dir = f"/home/amedeo/Documents/programmation/data_article/data_final/{subject}/"
 
     mvc = sio.loadmat(data_dir + f"MVC_{subject}.mat")["MVC_list_max"][0]
     mvc_list = [
@@ -513,14 +510,14 @@ if __name__ == "__main__":
     ]
     result_dir = data_dir
     # trials = ["abd", "abd_cocon", "flex", "flex_cocon", "cycl","cycl_cocon"]  # , "abd_1_rep", "flex_1_rep", "flex_cocon_1_rep"]
-    trials = ["abd_1_rep"]
-    configs = ["full"]  # , "mhe"]
+    trials = ["abd"]
+    configs = ["mhe"]  # , "mhe"]
     for config in configs:
         is_mhe = False if config == "full" else True
         for trial in trials:
             offline_path = result_dir + f"{trial}"
             file_name = f"{trial}_result"
-            optim_f_iso = False
+            optim_f_iso = True
             if is_mhe:
                 solver_options = {
                     "sim_method_jac_reuse": 1,
@@ -537,9 +534,10 @@ if __name__ == "__main__":
                 interpol_factor = 1
 
             configuration_dic = {
-                "model_path": data_dir + f"Wu_Shoulder_Model_mod_wt_wrapp_{subject}{scal}.bioMod",
+                "model_path": data_dir + f"model_{subject}{scal}.bioMod",
                 "mhe_time": 0.1,
                 "interpol_factor": interpol_factor,
+                "torque_driven": False,
                 "use_torque": False,
                 "use_excitation": False,
                 "save_results": True,
@@ -566,9 +564,9 @@ if __name__ == "__main__":
                 "solver_options": solver_options,
                 "n_loop": 1,
                 # "init_n": 100,
-                "final_n": 150,
-                "ode_solver": OdeSolver.COLLOCATION(),
-                "implicit_dynamics": True,
+                # "final_n": 150,
+                "ode_solver": OdeSolver.RK4(),
+                "implicit_dynamics": False,
             }
 
             if configuration_dic["kin_data_to_track"] == "markers":
@@ -586,8 +584,8 @@ if __name__ == "__main__":
                              "plot_q_freq": 20,
                              "print_lvl": 1}
 
-            # data_to_show = ["force"]#, "q"]
-            data_to_show = None
+            data_to_show = ["force"]#, "q"]
+            # data_to_show = None
             server_ip = "127.0.0.1"
             server_port = 50000
             MHE = MuscleForceEstimator(configuration_dic)

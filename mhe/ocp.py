@@ -281,7 +281,7 @@ def prepare_problem(
             np.concatenate((x0[:biorbd_model.nbQ(), :], np.zeros((biorbd_model.nbQ(), x0.shape[1])))),
             interpolation=InterpolationType.EACH_FRAME,
         )
-        u0 = np.concatenate((u0, np.zeros((biorbd_model.nbQ(), u0.shape[1]))))
+        # u0 = np.concatenate((u0, np.zeros((biorbd_model.nbQ(), u0.shape[1]))))
         # x_init = InitialGuess(x0, interpolation=InterpolationType.EACH_FRAME)
         u_init = InitialGuess(u0[:, :-1], interpolation=InterpolationType.EACH_FRAME)
 
