@@ -188,26 +188,26 @@ class MuscleForceEstimator:
 
         # Distribute muscle target to fit EMG recording
         self.muscles_target = np.zeros((len(self.muscle_track_idx), int(muscles_target.shape[1])))
-        # self.muscles_target[[0, 1, 2], :] = muscles_target[0, :]
-        # self.muscles_target[[3], :] = muscles_target[1, :]
-        # self.muscles_target[4, :] = muscles_target[2, :]
-        # self.muscles_target[5, :] = muscles_target[3, :]
-        # self.muscles_target[[6, 7], :] = muscles_target[4, :]
-        # self.muscles_target[[8, 9, 10], :] = muscles_target[5, :]
-        # self.muscles_target[[11], :] = muscles_target[6, :]
-        # self.muscles_target[[12], :] = muscles_target[7, :]
-        # self.muscles_target[[13], :] = muscles_target[8, :]
-        # self.muscles_target[[14], :] = muscles_target[9, :]
         self.muscles_target[[0, 1, 2], :] = muscles_target[0, :]
         self.muscles_target[[3], :] = muscles_target[1, :]
         self.muscles_target[4, :] = muscles_target[2, :]
-        self.muscles_target[[5, 6], :] = muscles_target[3, :]
-        self.muscles_target[[7, 8, 9], :] = muscles_target[4, :]
-        self.muscles_target[[10], :] = muscles_target[5, :]
+        self.muscles_target[5, :] = muscles_target[3, :]
+        self.muscles_target[[6, 7], :] = muscles_target[4, :]
+        self.muscles_target[[8, 9, 10], :] = muscles_target[5, :]
         self.muscles_target[[11], :] = muscles_target[6, :]
         self.muscles_target[[12], :] = muscles_target[7, :]
         self.muscles_target[[13], :] = muscles_target[8, :]
         self.muscles_target[[14], :] = muscles_target[9, :]
+        # self.muscles_target[[0, 1, 2], :] = muscles_target[0, :]
+        # self.muscles_target[[3], :] = muscles_target[1, :]
+        # self.muscles_target[4, :] = muscles_target[2, :]
+        # self.muscles_target[[5, 6], :] = muscles_target[3, :]
+        # self.muscles_target[[7, 8, 9], :] = muscles_target[4, :]
+        # self.muscles_target[[10], :] = muscles_target[5, :]
+        # self.muscles_target[[11], :] = muscles_target[6, :]
+        # self.muscles_target[[12], :] = muscles_target[7, :]
+        # self.muscles_target[[13], :] = muscles_target[8, :]
+        # self.muscles_target[[14], :] = muscles_target[9, :]
         self.muscles_target = self.muscles_target / np.repeat(mvc_list, muscles_target.shape[1]).reshape(
             len(mvc_list), muscles_target.shape[1]
         )
@@ -378,13 +378,6 @@ class MuscleForceEstimator:
                 export_options={"frame_to_export": self.ns_mhe - 1},
                 solver=self.solver,
             )
-            data_to_save = {}
-            sol_int = final_sol.integrate(shooting_type=Shooting.SINGLE_CONTINUOUS,
-                                          merge_phases=True,
-                                          keep_intermediate_points=False,
-                                          integrator=SolutionIntegrator.SCIPY_RK45)
-            data_to_save["q_int"] = sol_int.states["all"]
-            add_data_to_pickle(data_to_save, f"{self.result_dir}/{self.result_file_name}")
             # final_sol.graphs()
         else:
             for i in range(n_loop):
@@ -487,8 +480,8 @@ if __name__ == "__main__":
 
     scaled = True
     scal = "_scaled" if scaled else ""
-    subject = f"subject_2"
-    data_dir = f"/home/amedeo/Documents/programmation/data_article/data_final/{subject}/"
+    subject = f"Clara"
+    data_dir = f"/home/amedeo/Documents/programmation/data_article/{subject}/"
 
     mvc = sio.loadmat(data_dir + f"MVC_{subject}.mat")["MVC_list_max"][0]
     mvc_list = [
@@ -517,7 +510,7 @@ if __name__ == "__main__":
         for trial in trials:
             offline_path = result_dir + f"{trial}"
             file_name = f"{trial}_result"
-            optim_f_iso = True
+            optim_f_iso = False
             if is_mhe:
                 solver_options = {
                     "sim_method_jac_reuse": 1,
@@ -534,7 +527,8 @@ if __name__ == "__main__":
                 interpol_factor = 1
 
             configuration_dic = {
-                "model_path": data_dir + f"model_{subject}{scal}.bioMod",
+                # "model_path": data_dir + f"model_{subject}{scal}.bioMod",
+                "model_path": data_dir + f"Wu_Shoulder_Model_mod_wt_wrapp_{subject}_scaled.bioMod",
                 "mhe_time": 0.1,
                 "interpol_factor": interpol_factor,
                 "torque_driven": False,
@@ -584,8 +578,8 @@ if __name__ == "__main__":
                              "plot_q_freq": 20,
                              "print_lvl": 1}
 
-            data_to_show = ["force"]#, "q"]
-            # data_to_show = None
+            # data_to_show = ["force", "q"]
+            data_to_show = None
             server_ip = "127.0.0.1"
             server_port = 50000
             MHE = MuscleForceEstimator(configuration_dic)
