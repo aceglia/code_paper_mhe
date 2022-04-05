@@ -1,8 +1,9 @@
 import numpy as np
 from biosiglive.data_processing import add_data_to_pickle
-from biosiglive.data_plot import init_plot_force, init_plot_q, update_plot_force, update_plot_q
+from biosiglive.data_plot import update_plot_force
 from time import strftime
 import datetime
+from scipy.interpolate import interp1d
 import os
 
 
@@ -79,20 +80,69 @@ def save_results(
     kin_data_to_track="markers",
     track_emg=False,
     use_torque=True,
-    use_excitation=False,
     result_dir=None,
     file_name=None,
-    is_mhe=True,
     file_name_prefix="",
 ):
-    dyn = "act" if use_excitation is not True else "exc"
+
     torque = "_torque" if use_torque else ""
     emg = "_EMG_" if track_emg else "_"
-    full = "full_" if not is_mhe else "mhe_"
-    file_name = file_name if file_name else f"Results_{full}{kin_data_to_track}{emg}{dyn}{torque}_driven_{current_time}"
+    file_name = file_name if file_name else f"Results_mhe_{kin_data_to_track}{emg}{torque}_driven_{current_time}"
     file_name = file_name_prefix + file_name
     result_dir = result_dir if result_dir else f"results/results_{strftime('%Y%m%d-%H%M')[:8]}"
     if not os.path.isdir(f"results/"):
         os.mkdir(f"results/")
     data_path = f"{result_dir}/{file_name}"
     add_data_to_pickle(data, data_path)
+
+
+def muscle_mapping(muscles_target_tmp, mvc_list, muscle_track_idx):
+    muscles_target = np.zeros((len(muscle_track_idx), int(muscles_target_tmp.shape[1])))
+    muscles_target[[0, 1, 2], :] = muscles_target_tmp[0, :]
+    muscles_target[[3], :] = muscles_target_tmp[1, :]
+    muscles_target[4, :] = muscles_target_tmp[2, :]
+    muscles_target[5, :] = muscles_target_tmp[3, :]
+    muscles_target[[6, 7], :] = muscles_target_tmp[4, :]
+    muscles_target[[8, 9, 10], :] = muscles_target_tmp[5, :]
+    muscles_target[[11], :] = muscles_target_tmp[6, :]
+    muscles_target[[12], :] = muscles_target_tmp[7, :]
+    muscles_target[[13], :] = muscles_target_tmp[8, :]
+    muscles_target[[14], :] = muscles_target_tmp[9, :]
+    muscles_target = muscles_target / np.repeat(mvc_list, muscles_target_tmp.shape[1]).reshape(
+        len(mvc_list), muscles_target_tmp.shape[1]
+    )
+    return muscles_target
+
+
+def interpolate_data(interp_factor, x_ref, muscles_target, markers_target):
+    # interpolate target
+    if interp_factor != 1:
+        # x_ref
+        x = np.linspace(0, x_ref.shape[1] / 100, x_ref.shape[1])
+        f_x = interp1d(x, x_ref)
+        x_new = np.linspace(0, x_ref.shape[1] / 100, int(x_ref.shape[1] * interp_factor))
+        x_ref = f_x(x_new)
+
+        # markers_ref
+        markers_ref = np.zeros(
+            (3, markers_target.shape[1], int(markers_target.shape[2] * interp_factor))
+        )
+        for i in range(3):
+            x = np.linspace(0, markers_target.shape[2] / 100, markers_target.shape[2])
+            f_mark = interp1d(x, markers_target[i, :, :])
+            x_new = np.linspace(
+                0, markers_target.shape[2] / 100, int(markers_target.shape[2] * interp_factor)
+            )
+            markers_ref[i, :, :] = f_mark(x_new)
+
+        # muscle_target
+        x = np.linspace(0, muscles_target.shape[1] / 100, muscles_target.shape[1])
+        f_mus = interp1d(x, muscles_target)
+        x_new = np.linspace(
+            0, muscles_target.shape[1] / 100, int(muscles_target.shape[1] * interp_factor)
+        )
+        muscles_target = f_mus(x_new)
+    else:
+        markers_ref = markers_target
+
+    return x_ref, markers_ref, muscles_target
