@@ -60,7 +60,7 @@ def read_sto_mot_file(filename):
     return data
 
 
-def initialize(model_path: str, scaling: bool = False, off_line: bool = True, mass: int = None):
+def initialize(model_path: str, data_dir: str, scaling: bool = False, off_line: bool = True, mass: int = None):
     """
     Initialize the model with a Kalman filter and/or scale it.
 
@@ -68,6 +68,8 @@ def initialize(model_path: str, scaling: bool = False, off_line: bool = True, ma
     ----------
     model_path : str
         Path of the model to initialize
+    data_dir : str
+        Path of the directory where the data are stored
     scaling : bool, optional
         If True, the model will be scaled using opensim. The default is False.
     off_line : bool, optional
@@ -83,9 +85,7 @@ def initialize(model_path: str, scaling: bool = False, off_line: bool = True, ma
         n_marks = 16
         for i in range(5):
             client = Client(server_ip, server_port, "TCP")
-            markers_tmp = client.get_data(
-                ["markers"], read_frequency=100, nb_of_data_to_export=10, get_names=True
-            )
+            markers_tmp = client.get_data(["markers"], read_frequency=100, nb_of_data_to_export=10, get_names=True)
             sleep((1 / 100) * 10)
             if i == 0:
                 mark_0 = markers_tmp["markers"]
@@ -126,9 +126,9 @@ def initialize(model_path: str, scaling: bool = False, off_line: bool = True, ma
         # ---------- model scaling ------------ #
         from pathlib import Path
 
-        osim_model_path = f"{data_dir}/Wu_Shoulder_Model_mod_wt_wrapp_{subject}.osim"
+        osim_model_path = f"{data_dir}/model_{subject}.osim"
         model_output = f"{data_dir}/" + Path(osim_model_path).stem + f"_scaled.osim"
-        scaling_tool = "scaling_tool.xml"
+        scaling_tool = f"{data_dir}/scaling_tool.xml"
         trc_file = f"{data_dir}/anato.trc"
         C3DtoTRC.WriteTrcFromMarkersData(
             trc_file,
@@ -154,7 +154,7 @@ def initialize(model_path: str, scaling: bool = False, off_line: bool = True, ma
             xml_output=f"{data_dir}/scaling_tool_output.xml",
             static_path=trc_file,
             coordinate_file_name=f"{data_dir}/ik/anato.mot",
-            mass=mass
+            mass=mass,
         )
 
         convert_model(
@@ -198,10 +198,10 @@ def convert_model(in_path: str, out_path: str, viz: bool = None):
 
 
 if __name__ == "__main__":
-    trial = "abd_test"
-    subject = "Clara"
+    trial = "abd"
+    subject = "Subject_1"
     mass = 62
-    data_dir = f"/home/amedeo/Documents/programmation/data_article/{subject}"
-    # model_path = f"{data_dir}/Wu_Shoulder_Model_mod_wt_wrapp_{subject}_scaled.bioMod"
-    model_path = f"{data_dir}/Wu_Shoulder_Model_mod_wt_wrapp_{subject}.osim"
-    initialize(model_path, scaling=True, off_line=True, mass=mass)
+    data_dir = f"data_final/{subject}"
+    # model_path = f"{data_dir}/model_{subject}_scaled.bioMod"
+    model_path = f"{data_dir}/model_{subject}.osim"
+    initialize(model_path, data_dir, scaling=True, off_line=True, mass=mass)

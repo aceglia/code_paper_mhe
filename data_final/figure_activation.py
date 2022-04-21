@@ -1,5 +1,6 @@
 import numpy as np
 from biosiglive.data_processing import read_data
+
 try:
     import biorbd
 except:
@@ -13,6 +14,8 @@ import seaborn
 # --- RMSE --- #
 def rmse(data, data_ref):
     return np.sqrt(((data - data_ref) ** 2).mean())
+
+
 def std(data, data_ref):
     return np.sqrt(((data - data_ref) ** 2).std())
 
@@ -69,7 +72,6 @@ muscles_names = [
     "Triceps Long",
     "Triceps Lateral",
     "Triceps Medial",
-
 ]
 
 not_interest_muscle = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 17, 19, 22, 25]
@@ -97,7 +99,7 @@ for s in range(len(trial)):
             else:
                 fig.set_xticklabels([])
             if count in [0, 3, 6, 9]:
-                plt.ylabel("Muscle activation \n(% MVC)", fontsize=fontsize-2)
+                plt.ylabel("Muscle activation \n(% MVC)", fontsize=fontsize - 2)
             else:
                 fig.set_yticklabels([])
             plt.yticks(fontsize=fontsize)

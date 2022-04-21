@@ -27,7 +27,7 @@ def check_and_adjust_dim(*args):
     return conf
 
 
-def update_plot(estimator_instance, force_est: np.ndarray, q_est:np.ndarray, init_time: float = None):
+def update_plot(estimator_instance, force_est: np.ndarray, q_est: np.ndarray, init_time: float = None):
     """
     Update the plot of the mhe.
 
@@ -46,7 +46,7 @@ def update_plot(estimator_instance, force_est: np.ndarray, q_est:np.ndarray, ini
     absolute_delay_plot = 0
     if estimator_instance.data_to_show.count("force") != 0:
         estimator_instance.force_to_plot = np.append(
-            estimator_instance.force_to_plot[:, -estimator_instance.exp_freq - 1:], force_est, axis=1
+            estimator_instance.force_to_plot[:, -estimator_instance.exp_freq - 1 :], force_est, axis=1
         )
         update_plot_force(
             estimator_instance.force_to_plot,
@@ -82,7 +82,7 @@ def update_plot(estimator_instance, force_est: np.ndarray, q_est:np.ndarray, ini
     return np.round(absolute_delay_plot, 3)
 
 
-def compute_force(sol: bioptim.Solution, get_force, nbmt: int, use_excitation : bool = False):
+def compute_force(sol: bioptim.Solution, get_force, nbmt: int, use_excitation: bool = False):
     """
     Compute the force.
 
@@ -221,23 +221,17 @@ def interpolate_data(interp_factor: int, x_ref: np.ndarray, muscles_target: np.n
         x_ref = f_x(x_new)
 
         # markers_ref
-        markers_ref = np.zeros(
-            (3, markers_target.shape[1], int(markers_target.shape[2] * interp_factor))
-        )
+        markers_ref = np.zeros((3, markers_target.shape[1], int(markers_target.shape[2] * interp_factor)))
         for i in range(3):
             x = np.linspace(0, markers_target.shape[2] / 100, markers_target.shape[2])
             f_mark = interp1d(x, markers_target[i, :, :])
-            x_new = np.linspace(
-                0, markers_target.shape[2] / 100, int(markers_target.shape[2] * interp_factor)
-            )
+            x_new = np.linspace(0, markers_target.shape[2] / 100, int(markers_target.shape[2] * interp_factor))
             markers_ref[i, :, :] = f_mark(x_new)
 
         # muscle_target
         x = np.linspace(0, muscles_target.shape[1] / 100, muscles_target.shape[1])
         f_mus = interp1d(x, muscles_target)
-        x_new = np.linspace(
-            0, muscles_target.shape[1] / 100, int(muscles_target.shape[1] * interp_factor)
-        )
+        x_new = np.linspace(0, muscles_target.shape[1] / 100, int(muscles_target.shape[1] * interp_factor))
         muscles_target = f_mus(x_new)
     else:
         markers_ref = markers_target

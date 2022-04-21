@@ -1,5 +1,6 @@
 import numpy as np
 from biosiglive.data_processing import read_data
+
 try:
     import biorbd
 except:
@@ -13,6 +14,8 @@ import seaborn
 # --- RMSE --- #
 def rmse(data, data_ref):
     return np.sqrt(((data - data_ref) ** 2).mean())
+
+
 def std(data, data_ref):
     return np.sqrt(((data - data_ref) ** 2).std())
 
@@ -69,7 +72,6 @@ muscles_names = [
     "Triceps Long",
     "Triceps Lateral",
     "Triceps Medial",
-
 ]
 
 not_interest_muscle = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 17, 19, 22, 25]
@@ -88,7 +90,11 @@ for s in range(len(trial)):
     for i in range(models[0].nbMuscles()):
         fig = plt.subplot(4, 3, count + 1)
         if i not in not_interest_muscle:
-            plt.plot(t, result_mat[s]["f_est"][i, :] / models[0].muscle(i).characteristics().forceIsoMax() * 100, label="Estimated muscle force")
+            plt.plot(
+                t,
+                result_mat[s]["f_est"][i, :] / models[0].muscle(i).characteristics().forceIsoMax() * 100,
+                label="Estimated muscle force",
+            )
             # if i in muscle_track_idx:
             #     idx = muscle_track_idx.index(i)
             #     plt.plot(t, result_mat[s]["muscles_target"][idx, :] * 100, label="Experimental EMG")
@@ -102,7 +108,7 @@ for s in range(len(trial)):
             else:
                 fig.set_xticklabels([])
             if count in [0, 3, 6, 9]:
-                plt.ylabel("Muscle force\n(% Fiso max)", fontsize=fontsize-2)
+                plt.ylabel("Muscle force\n(% Fiso max)", fontsize=fontsize - 2)
             else:
                 fig.set_yticklabels([])
             plt.yticks(fontsize=fontsize)

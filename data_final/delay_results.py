@@ -49,8 +49,11 @@ for subject in subjects:
 
 plot_lat = np.round(np.mean(plot_lat), 2)
 plot_std = np.round(np.mean(plot_std), 2)
-total_plot_lat , total_plot_std = plot_lat*1000, plot_std*1000
-total_process_lat, total_process_std = np.round(np.mean(process_lat) * 1000, 2), np.round(np.mean(process_std) * 1000, 2)
+total_plot_lat, total_plot_std = plot_lat * 1000, plot_std * 1000
+total_process_lat, total_process_std = (
+    np.round(np.mean(process_lat) * 1000, 2),
+    np.round(np.mean(process_std) * 1000, 2),
+)
 total_vicon_lat, total_vicon_std = np.round(vicon_lat[0] * 1000, 2), np.round(vicon_std[0] * 1000, 2)
 
 print(f"Plot latency : {total_plot_lat} ms +/- {total_plot_std} ms")
@@ -65,12 +68,12 @@ print(f"Solve duration: {1/np.mean(sol_freq)*1000} ms +/- {np.std([1/i for i in 
 
 print(
     f"\hline computer 1 & Nexus & ${total_vicon_lat}$ & ${total_vicon_std}$\ \ \n "
-      f"& Processing & ${total_process_lat}$ & ${total_process_std}$\ \ \n"
-      f"& TCP/IP & ${6.1}$ & ${1.2}$\ \ \n"
-      f"\hline"
- 	  f"computer 2 & Estimator & ${np.round(1/np.mean(sol_freq)*1000,n_round)}$ & ${np.std([1/i for i in sol_freq]) *1000}$\ \ \n "
-      f"& Vizualisation & ${total_plot_lat}$ & ${total_plot_std}$\ \ \n"
-      f"\hline"
-      f"& Total & ${total_process_lat+total_vicon_lat+total_plot_lat+1/np.mean(sol_freq)*1000+6.1}$ &"
-      f" ${total_process_std+total_vicon_std+total_plot_std + np.std([1/i for i in sol_freq]) *1000+1.2 }$\ \ \n"
-      )
+    f"& Processing & ${total_process_lat}$ & ${total_process_std}$\ \ \n"
+    f"& TCP/IP & ${6.1}$ & ${1.2}$\ \ \n"
+    f"\hline"
+    f"computer 2 & Estimator & ${np.round(1/np.mean(sol_freq)*1000,n_round)}$ & ${np.std([1/i for i in sol_freq]) *1000}$\ \ \n "
+    f"& Vizualisation & ${total_plot_lat}$ & ${total_plot_std}$\ \ \n"
+    f"\hline"
+    f"& Total & ${total_process_lat+total_vicon_lat+total_plot_lat+1/np.mean(sol_freq)*1000+6.1}$ &"
+    f" ${total_process_std+total_vicon_std+total_plot_std + np.std([1/i for i in sol_freq]) *1000+1.2 }$\ \ \n"
+)

@@ -13,6 +13,7 @@ class MuscleForceEstimator:
     """
     This class is used to define the muscle force estimator.
     """
+
     def __init__(self, *args):
         """
         Initialize the muscle force estimator.
@@ -115,9 +116,11 @@ class MuscleForceEstimator:
         if self.test_offline:
             x_ref, markers_target, muscles_target = get_reference_data(self.offline_file)
             self.final_n = -1 if not self.final_n else self.final_n
-            x_ref, markers_target, muscles_target = (x_ref[:, self.init_n:self.final_n],
-                                                     markers_target[:, :, self.init_n:self.final_n],
-                                                     muscles_target[:, self.init_n:self.final_n])
+            x_ref, markers_target, muscles_target = (
+                x_ref[:, self.init_n : self.final_n],
+                markers_target[:, :, self.init_n : self.final_n],
+                muscles_target[:, self.init_n : self.final_n],
+            )
 
             self.offline_data = [x_ref, markers_target, muscles_target]
 
@@ -139,16 +142,13 @@ class MuscleForceEstimator:
         window_len = self.ns_mhe
         window_duration = self.T_mhe
 
-        self.x_ref, self.markers_target, muscles_target = interpolate_data(self.interpol_factor,
-                                                                           x_ref,
-                                                                           muscles_target,
-                                                                           markers_target
-                                                                           )
+        self.x_ref, self.markers_target, muscles_target = interpolate_data(
+            self.interpol_factor, x_ref, muscles_target, markers_target
+        )
 
-        self.muscles_target = muscle_mapping(muscles_target_tmp=muscles_target,
-                                             mvc_list=mvc_list,
-                                             muscle_track_idx=self.muscle_track_idx
-                                             )[:, :window_len]
+        self.muscles_target = muscle_mapping(
+            muscles_target_tmp=muscles_target, mvc_list=mvc_list, muscle_track_idx=self.muscle_track_idx
+        )[:, :window_len]
         self.kin_target = (
             self.markers_target[:, :, : window_len + 1]
             if self.kin_data_to_track == "markers"
@@ -204,13 +204,13 @@ class MuscleForceEstimator:
         return data
 
     def run(
-            self,
-            var: dict,
-            server_ip: str,
-            server_port: int,
-            data_to_show: list = None,
-            test_offline: bool = False,
-            offline_file: str = None
+        self,
+        var: dict,
+        server_ip: str,
+        server_port: int,
+        data_to_show: list = None,
+        test_offline: bool = False,
+        offline_file: str = None,
     ):
         """
         Run the whole multiprocess program.
@@ -244,9 +244,7 @@ class MuscleForceEstimator:
             proc_plot = self.process(name="plot", target=MuscleForceEstimator.run_plot, args=(self,))
             proc_plot.start()
 
-        proc_mhe = self.process(
-            name="mhe", target=MuscleForceEstimator.run_mhe, args=(self, var, data_to_show)
-        )
+        proc_mhe = self.process(name="mhe", target=MuscleForceEstimator.run_mhe, args=(self, var, data_to_show))
         proc_mhe.start()
         if self.data_to_show:
             proc_plot.join()
@@ -263,6 +261,7 @@ class MuscleForceEstimator:
 
             if data_to_show == "q":
                 import bioviz
+
                 self.b = bioviz.Viz(
                     model_path=self.model_path,
                     show_global_center_of_mass=False,
@@ -288,9 +287,7 @@ class MuscleForceEstimator:
                 is_working = False
 
             if is_working:
-                plot_delay = update_plot(
-                    self, data["force_est"], data["q_est"], init_time=data["init_time_frame"]
-                )
+                plot_delay = update_plot(self, data["force_est"], data["q_est"], init_time=data["init_time_frame"])
                 dic = {"plot_delay": plot_delay}
                 save_results(dic, self.current_time, result_dir=self.result_dir, file_name_prefix="plot_delay_")
 
@@ -319,12 +316,7 @@ class MuscleForceEstimator:
 
         self.mhe.solve(
             lambda mhe, i, sol: update_mhe(
-                mhe,
-                i,
-                sol,
-                self,
-                initial_time=initial_time,
-                offline_data=self.offline_data,
+                mhe, i, sol, self, initial_time=initial_time, offline_data=self.offline_data
             ),
             export_options={"frame_to_export": self.ns_mhe - 1},
             solver=self.solver,
@@ -333,16 +325,21 @@ class MuscleForceEstimator:
 
 if __name__ == "__main__":
     subject = f"subject_2"
-    data_dir = f"/home/amedeo/Documents/programmation/data_article/data_final/{subject}/"
+    data_dir = f"data_final/{subject}/"
 
     mvc = sio.loadmat(data_dir + f"MVC_{subject}.mat")["MVC_list_max"][0]
     mvc_list = [
-        mvc[0], mvc[0], mvc[0],  # MVC Pectoralis sternalis
+        mvc[0],
+        mvc[0],
+        mvc[0],  # MVC Pectoralis sternalis
         mvc[1],  # MVC Deltoid anterior
         mvc[2],  # MVC Deltoid medial
         mvc[3],  # MVC Deltoid posterior
-        mvc[4], mvc[4],  # MVC Biceps brachii
-        mvc[5], mvc[5], mvc[5],  # MVC Triceps brachii
+        mvc[4],
+        mvc[4],  # MVC Biceps brachii
+        mvc[5],
+        mvc[5],
+        mvc[5],  # MVC Triceps brachii
         mvc[6],  # MVC Trapezius superior
         mvc[7],  # MVC Trapezius medial
         mvc[8],  # MVC Trapezius inferior
@@ -357,37 +354,39 @@ if __name__ == "__main__":
         for trial in trials:
             offline_path = result_dir + f"{trial}"
             file_name = f"{trial}_result"
-            solver_options = {
-                "sim_method_jac_reuse": 1,
-                "nlp_solver_step_length": 0.5,
-                "levenberg_marquardt": 100.0,
+            solver_options = {"sim_method_jac_reuse": 1, "nlp_solver_step_length": 0.5, "levenberg_marquardt": 100.0}
+            configuration_dic = {
+                "model_path": data_dir + f"model_{subject}_scaled.bioMod",
+                "mhe_time": 0.1,
+                "interpol_factor": 2,
+                "use_torque": False,
+                "save_results": True,
+                "track_emg": True,
+                "kin_data_to_track": "markers",
+                "mvc_list": mvc_list,
+                "exp_freq": 32,
+                "muscle_track_idx": [
+                    14,
+                    25,
+                    26,  # MVC Pectoralis sternalis
+                    13,  # MVC Deltoid anterior
+                    15,  # MVC Deltoid medial
+                    21,  # MVC Deltoid posterior
+                    23,
+                    24,  # MVC Biceps brachii
+                    28,
+                    29,
+                    30,  # MVC Triceps brachii
+                    10,  # MVC Trapezius superior
+                    2,  # MVC Trapezius medial
+                    3,  # MVC Trapezius inferior
+                    27,  # MVC Latissimus dorsi
+                ],
+                "result_dir": result_dir,
+                "result_file_name": file_name,
+                "solver_options": solver_options,
+                "weights": configure_weights(),
             }
-            configuration_dic = {"model_path": data_dir + f"model_{subject}_scaled.bioMod",
-                                 "mhe_time": 0.1,
-                                 "interpol_factor": 2,
-                                 "use_torque": False,
-                                 "save_results": True,
-                                 "track_emg": True,
-                                 "kin_data_to_track": "markers",
-                                 "mvc_list": mvc_list,
-                                 "exp_freq": 32,
-                                 "muscle_track_idx": [
-                                     14, 25, 26,  # MVC Pectoralis sternalis
-                                     13,  # MVC Deltoid anterior
-                                     15,  # MVC Deltoid medial
-                                     21,  # MVC Deltoid posterior
-                                     23, 24,  # MVC Biceps brachii
-                                     28, 29, 30,  # MVC Triceps brachii
-                                     10,  # MVC Trapezius superior
-                                     2,  # MVC Trapezius medial
-                                     3,  # MVC Trapezius inferior
-                                     27,  # MVC Latissimus dorsi
-                                 ],
-                                 "result_dir": result_dir,
-                                 "result_file_name": file_name,
-                                 "solver_options": solver_options,
-                                 "weights": configure_weights()
-                                 }
 
             variables_dic = {"print_lvl": 1}  # print level 0 = no print, 1 = print information
 
@@ -396,11 +395,4 @@ if __name__ == "__main__":
             server_ip = "127.0.0.1"
             server_port = 50000
             MHE = MuscleForceEstimator(configuration_dic)
-            MHE.run(
-                variables_dic,
-                server_ip,
-                server_port,
-                data_to_show,
-                test_offline=True,
-                offline_file=offline_path,
-            )
+            MHE.run(variables_dic, server_ip, server_port, data_to_show, test_offline=True, offline_file=offline_path)

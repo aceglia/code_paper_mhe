@@ -11,6 +11,7 @@ class WriteTrc:
     """
     Class to write TRC files.
     """
+
     def __init__(self):
         self.output_file_path = None
         self.input_file_path = None
@@ -120,6 +121,7 @@ class WriteTrcFromC3d(WriteTrc):
     """
     Class to write TRC files from C3D files.
     """
+
     def __init__(
         self,
         output_file_path: str,
@@ -166,6 +168,7 @@ class WriteTrcFromMarkersData(WriteTrc):
     """
     Class to write TRC files from markers data.
     """
+
     def __init__(
         self,
         output_file_path: str,

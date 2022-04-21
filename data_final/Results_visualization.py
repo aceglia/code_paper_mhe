@@ -23,13 +23,16 @@ import glob
 # --- RMSE --- #
 def rmse(data, data_ref):
     return np.sqrt(((data - data_ref) ** 2).mean())
+
+
 def std(data, data_ref):
     return np.sqrt(((data - data_ref) ** 2).std())
+
 
 parent = os.path.dirname(os.getcwd())
 subject = ["subject_1"]  # , "Mathis"]#, "subject_2"]
 # trial = ["cycl_cocon_wt_damping_wt_torque_result"]#, "Results_mhe_markers_EMG_act_torque_driven_20220214-1819"]#, "test_abd_full"]
-trial = ["cycl_cocon_result"]#, "abd_SQP_result"]
+trial = ["cycl_cocon_result"]  # , "abd_SQP_result"]
 result_mat = []
 nb_full_node = None
 models = []
@@ -73,7 +76,7 @@ else:
 t = np.linspace(0, tf, nb_mhe)
 for i in range(len(result_mat)):
     if "full" in trial[i]:
-        x = np.linspace(0, tf, nb_full_node-7)
+        x = np.linspace(0, tf, nb_full_node - 7)
         x_new = t
         # interpolation full data
         # muscles
@@ -194,19 +197,22 @@ for s in range(len(trial)):
             markers_full_ref[:, :, i] = np.array([mark.to_array() for mark in models[0].markers(full_kalman[:, i])]).T
         markers_full_tot = np.ndarray((3, result_mat[s]["kin_target"].shape[1], result_mat[s]["X_est"].shape[1]))
         for i in range(result_mat[s]["X_est"].shape[1]):
-            markers_full_tot[:, :, i] = np.array([mark.to_array() for mark in models[0].markers(result_mat[s]["X_est"][:, i])]).T
+            markers_full_tot[:, :, i] = np.array(
+                [mark.to_array() for mark in models[0].markers(result_mat[s]["X_est"][:, i])]
+            ).T
         markers_full_ref_tot = np.ndarray((3, result_mat[s]["kin_target"].shape[1], result_mat[s]["X_est"].shape[1]))
         for i in range(result_mat[s]["X_est"].shape[1]):
             markers_full_ref_tot[:, :, i] = np.array(
-                [mark.to_array() for mark in models[0].markers(result_mat[s]["kalman"][:, i])]).T
+                [mark.to_array() for mark in models[0].markers(result_mat[s]["kalman"][:, i])]
+            ).T
 
     for i in range(result_mat[s]["kin_target"].shape[1]):
-        plt.subplot(4, 4, i+1)
+        plt.subplot(4, 4, i + 1)
         if i == 0:
             if "full" in trial[s]:
-                plt.plot(t, markers_full[0, i, :].T, '-g', alpha=0.8, label="Forward kin full")
-                plt.plot(t, markers_full[1, i, :].T, '-g', alpha=0.8)
-                plt.plot(t, markers_full[2, i, :].T, '-g', alpha=0.8)
+                plt.plot(t, markers_full[0, i, :].T, "-g", alpha=0.8, label="Forward kin full")
+                plt.plot(t, markers_full[1, i, :].T, "-g", alpha=0.8)
+                plt.plot(t, markers_full[2, i, :].T, "-g", alpha=0.8)
                 # for j in range(result_mat[0]["kin_target"].shape[0]):
                 #     rmse_tmp = rmse(markers_full_tot[j, i, :], result_mat[s]['kin_target'][j, i, :])
                 #     rmse_markers_full.append(rmse_tmp * 1000)
@@ -214,9 +220,9 @@ for s in range(len(trial)):
                 #     rmse_tmp = rmse(markers_full_ref_tot[j, i, :], result_mat[s]['kin_target'][j, i, :])
                 #     rmse_markers_full_ref.append(rmse_tmp * 1000)
             else:
-                plt.plot(result_mat[s]["kin_target"][0, i, :].T, '--r', label="kalman")
-                plt.plot(result_mat[s]["kin_target"][1, i, :].T, '--r')
-                plt.plot(result_mat[s]["kin_target"][2, i, :].T, '--r')
+                plt.plot(result_mat[s]["kin_target"][0, i, :].T, "--r", label="kalman")
+                plt.plot(result_mat[s]["kin_target"][1, i, :].T, "--r")
+                plt.plot(result_mat[s]["kin_target"][2, i, :].T, "--r")
                 plt.plot(markers[0, i, :].T, alpha=0.8, label=trial[s])
                 plt.plot(markers[1, i, :].T, alpha=0.8)
                 plt.plot(markers[2, i, :].T, alpha=0.8)
@@ -226,9 +232,9 @@ for s in range(len(trial)):
 
         else:
             if "full" in trial[s]:
-                plt.plot(t, markers_full[0, i, :].T, '-g', alpha=0.8)
-                plt.plot(t, markers_full[1, i, :].T, '-g', alpha=0.8)
-                plt.plot(t, markers_full[2, i, :].T, '-g', alpha=0.8)
+                plt.plot(t, markers_full[0, i, :].T, "-g", alpha=0.8)
+                plt.plot(t, markers_full[1, i, :].T, "-g", alpha=0.8)
+                plt.plot(t, markers_full[2, i, :].T, "-g", alpha=0.8)
                 # for j in range(result_mat[0]["kin_target"].shape[0]):
                 #     rmse_tmp = rmse(markers_full_tot[j, i, :], result_mat[s]['kin_target'][j, i, :])
                 #     rmse_markers_full.append(rmse_tmp * 1000)
@@ -236,14 +242,14 @@ for s in range(len(trial)):
                 #     rmse_tmp = rmse(markers_full_ref_tot[j, i, :], result_mat[s]['kin_target'][j, i, :])
                 #     rmse_markers_full_ref.append(rmse_tmp * 1000)
             else:
-                plt.plot( result_mat[s]["kin_target"][0, i, :].T, '--r')
-                plt.plot( result_mat[s]["kin_target"][1, i, :].T, '--r')
-                plt.plot( result_mat[s]["kin_target"][2, i, :].T, '--r')
-                plt.plot( markers[0, i, :].T, alpha=0.8)
-                plt.plot( markers[1, i, :].T, alpha=0.8)
-                plt.plot( markers[2, i, :].T, alpha=0.8)
+                plt.plot(result_mat[s]["kin_target"][0, i, :].T, "--r")
+                plt.plot(result_mat[s]["kin_target"][1, i, :].T, "--r")
+                plt.plot(result_mat[s]["kin_target"][2, i, :].T, "--r")
+                plt.plot(markers[0, i, :].T, alpha=0.8)
+                plt.plot(markers[1, i, :].T, alpha=0.8)
+                plt.plot(markers[2, i, :].T, alpha=0.8)
                 for j in range(result_mat[0]["kin_target"].shape[0]):
-                    rmse_tmp = rmse(markers[j, i, :], result_mat[s]['kin_target'][j, i, :])
+                    rmse_tmp = rmse(markers[j, i, :], result_mat[s]["kin_target"][j, i, :])
                     rmse_markers.append(rmse_tmp * 1000)
 
 plt.legend()
@@ -270,7 +276,7 @@ for s in range(len(trial)):
         # if i not in interset_muscle:
         if i in muscle_track_idx:
             idx = muscle_track_idx.index(i)
-            if not "full" in trial[s] and not 'wt' in trial[s]:
+            if not "full" in trial[s] and not "wt" in trial[s]:
                 plt.plot(result_mat[s]["muscles_target"][idx, :], "-r")
             if "wt" in trial[s]:
                 if idx == result_mat[s]["muscles_target"].shape[0]:
@@ -301,7 +307,7 @@ for s in range(len(trial)):
         plt.grid(True)
         count += 1
 # legend
-plt.legend(labels=[f"Estimated activation", "EMG"], bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.)
+plt.legend(labels=[f"Estimated activation", "EMG"], bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.0)
 plt.figure("Forces")
 plt.gcf().subplots_adjust(left=0.05, bottom=0.05, right=0.99, top=0.95, wspace=0.18, hspace=0.35)
 count = 0
@@ -335,7 +341,7 @@ for s in range(len(trial)):
                 plt.title(models[0].muscleNames()[i].to_string())
             plt.grid(True)
             count += 1
-rmse_int=[]
+rmse_int = []
 # for i in range(len(trial)):
 #     if "full" not in trial[i]:
 #         for j in range(models[0].nbQ()):

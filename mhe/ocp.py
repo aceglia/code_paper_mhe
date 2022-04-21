@@ -25,7 +25,14 @@ from bioptim import (
 )
 
 
-def muscle_forces(q: np.ndarray, qdot: np.ndarray, act: np.ndarray, controls: np.ndarray, model: biorbd.Model, use_excitation: bool = False):
+def muscle_forces(
+    q: np.ndarray,
+    qdot: np.ndarray,
+    act: np.ndarray,
+    controls: np.ndarray,
+    model: biorbd.Model,
+    use_excitation: bool = False,
+):
     """
     Compute the muscle force for a given state and controls.
 
@@ -244,7 +251,6 @@ def prepare_problem(
     nb_threads: int = 8,
     solver_options: dict = None,
     use_acados: bool = False,
-
 ):
     """
     Prepare the ocp problem and the solver to use
@@ -283,10 +289,7 @@ def prepare_problem(
 
     # Dynamics
     dynamics = DynamicsList()
-    dynamics.add(DynamicsFcn.MUSCLE_DRIVEN,
-                 with_excitations=False,
-                 with_torque=use_torque,
-                 expand=False,)
+    dynamics.add(DynamicsFcn.MUSCLE_DRIVEN, with_excitations=False, with_torque=use_torque, expand=False)
 
     # State path constraint
     x_bounds = BoundsList()
@@ -311,7 +314,7 @@ def prepare_problem(
         u0 = np.array([tau_init] * nbGT + [muscle_init] * biorbd_model.nbMuscles())
         u_init = InitialGuess(np.tile(u0, (window_len, 1)).T, interpolation=InterpolationType.EACH_FRAME)
     else:
-        u_init = InitialGuess(u0[:, : window_len], interpolation=InterpolationType.EACH_FRAME)
+        u_init = InitialGuess(u0[:, :window_len], interpolation=InterpolationType.EACH_FRAME)
 
     problem = CustomMhe(
         biorbd_model=biorbd_model,
@@ -541,16 +544,15 @@ def update_mhe(mhe, t: int, sol: bioptim.Solution, estimator_instance, initial_t
                 absolute_time_received_s = absolute_time_received_s + absolute_time_received_dic[key]
         absolute_delay_tcp = absolute_time_received_s - absolute_time_frame_s
 
-    x_ref, markers_ref, muscles_target = interpolate_data(estimator_instance.interpol_factor,
-                                                          x_ref,
-                                                          muscles_target,
-                                                          markers_target
-                                                          )
+    x_ref, markers_ref, muscles_target = interpolate_data(
+        estimator_instance.interpol_factor, x_ref, muscles_target, markers_target
+    )
 
-    muscles_ref = muscle_mapping(muscles_target_tmp=muscles_target,
-                                 mvc_list=estimator_instance.mvc_list,
-                                 muscle_track_idx=estimator_instance.muscle_track_idx
-                                 )
+    muscles_ref = muscle_mapping(
+        muscles_target_tmp=muscles_target,
+        mvc_list=estimator_instance.mvc_list,
+        muscle_track_idx=estimator_instance.muscle_track_idx,
+    )
     target = get_target(
         mhe=mhe,
         t=t,
@@ -567,7 +569,7 @@ def update_mhe(mhe, t: int, sol: bioptim.Solution, estimator_instance, initial_t
     mhe.slide_size = estimator_instance.slide_size
     if estimator_instance.test_offline:
         mhe.x_ref = x_ref[
-            :, estimator_instance.slide_size * t: (estimator_instance.ns_mhe + 1 + estimator_instance.slide_size * t)
+            :, estimator_instance.slide_size * t : (estimator_instance.ns_mhe + 1 + estimator_instance.slide_size * t)
         ]
         mhe.muscles_ref = target["muscle_target"][1]
 
@@ -575,9 +577,7 @@ def update_mhe(mhe, t: int, sol: bioptim.Solution, estimator_instance, initial_t
             mhe.kin_target = target["kin_target"][1]
         else:
             if isinstance(target["kin_target"][1], list):
-                mhe.kin_target = np.concatenate(
-                    (target["kin_target"][1][0], target["kin_target"][1][1]), axis=1
-                )
+                mhe.kin_target = np.concatenate((target["kin_target"][1][0], target["kin_target"][1][1]), axis=1)
             else:
                 mhe.kin_target = target["kin_target"][1]
 
@@ -588,9 +588,7 @@ def update_mhe(mhe, t: int, sol: bioptim.Solution, estimator_instance, initial_t
             mhe.kin_target = target["kin_target"][1]
         else:
             if isinstance(target["kin_target"][1], list):
-                mhe.kin_target = np.concatenate(
-                    (target["kin_target"][1][0], target["kin_target"][1][1]), axis=1
-                )
+                mhe.kin_target = np.concatenate((target["kin_target"][1][0], target["kin_target"][1][1]), axis=1)
             else:
                 mhe.kin_target = target["kin_target"][1]
 
@@ -608,7 +606,8 @@ def update_mhe(mhe, t: int, sol: bioptim.Solution, estimator_instance, initial_t
 
     if t > 0:
         force_est, q_est, dq_est, a_est, u_est = compute_force(
-            sol, estimator_instance.get_force, estimator_instance.nbMT)
+            sol, estimator_instance.get_force, estimator_instance.nbMT
+        )
 
         if estimator_instance.data_to_show:
             dic_to_put = {
@@ -640,9 +639,7 @@ def update_mhe(mhe, t: int, sol: bioptim.Solution, estimator_instance, initial_t
             }
             if t == 1:
                 data_to_save["Nmhe"] = estimator_instance.ns_mhe
-            data_to_save["muscles_target"] = (
-                muscles_target_to_save[:, -1:] if "muscle_target" in target.keys() else 0
-            )
+            data_to_save["muscles_target"] = muscles_target_to_save[:, -1:] if "muscle_target" in target.keys() else 0
             if estimator_instance.kin_data_to_track == "q":
                 kin_target = kin_target_to_save[:, -2:-1]
             else:
@@ -693,6 +690,7 @@ class CustomMhe(MovingHorizonEstimator):
     """
     Class for the custom MHE.
     """
+
     def __init__(self, **kwargs):
         self.init_w_kalman = False
         self.x_ref = None

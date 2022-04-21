@@ -79,10 +79,11 @@ for i in range(models[0].nbMuscles()):
         interest_muscles += [i]
 
 
-param_df = ([params[0]] * len(trial) * nb_mhe * len(interest_muscles)
-            + [params[1]] * len(trial) * nb_mhe * len(interest_muscles)
-            # + [params[2]] * len(trial) * nb_mhe * len(interest_muscles)
-             )
+param_df = (
+    [params[0]] * len(trial) * nb_mhe * len(interest_muscles)
+    + [params[1]] * len(trial) * nb_mhe * len(interest_muscles)
+    # + [params[2]] * len(trial) * nb_mhe * len(interest_muscles)
+)
 full_muscle_est_onset = [0] * models[0].nbMuscles()
 mhe_muscle_est_onset = [0] * models[0].nbMuscles()
 ref_muscle_est_onset = [0] * models[0].nbMuscles()
@@ -93,9 +94,9 @@ for t in trial:
     for param in params:
         for i in interest_muscles:
             if i == interest_muscles[0] and param == params[0] and t == trial[0]:
-                muscles_names = ([models[0].muscleNames()[i].to_string()] * nb_mhe)
+                muscles_names = [models[0].muscleNames()[i].to_string()] * nb_mhe
             else:
-                muscles_names += ([models[0].muscleNames()[i].to_string()] * nb_mhe)
+                muscles_names += [models[0].muscleNames()[i].to_string()] * nb_mhe
 
 count = 0
 data_df = np.zeros((len(params) * len(trial) * nb_mhe * len(interest_muscles)))
@@ -119,7 +120,7 @@ for p in range(len(params)):
                             if full_start[m] == 0:
                                 full_start[m] = j
                             full_muscle_est_onset[m] += 1
-                    data_df[count:count + nb_mhe] = full_muscle_est[m, :]
+                    data_df[count : count + nb_mhe] = full_muscle_est[m, :]
                     # names_df[count:count + nb_mhe] = np.array([models[0].muscleNames()[m].to_string()]*nb_mhe)
 
                 elif params[p] == "mhe" and "full" not in trial[i]:
@@ -128,7 +129,7 @@ for p in range(len(params)):
                             if mhe_start[m] == 0:
                                 mhe_start[m] = j
                             mhe_muscle_est_onset[m] += 1
-                    data_df[count:count + nb_mhe] = result_mat[i]["U_est"][m, :]
+                    data_df[count : count + nb_mhe] = result_mat[i]["U_est"][m, :]
                     # names_df[count:count + nb_mhe] = np.array([models[0].muscleNames()[m].to_string()]*nb_mhe)
                 elif params[p] == "ref" and "full" not in trial[i]:
                     if m in muscle_track_idx:
@@ -138,9 +139,9 @@ for p in range(len(params)):
                                 if ref_start[m] == 0:
                                     ref_start[m] = j
                                 ref_muscle_est_onset[m] += 1
-                        data_df[count:count + nb_mhe] = result_mat[i]["muscles_target"][idx, :]
+                        data_df[count : count + nb_mhe] = result_mat[i]["muscles_target"][idx, :]
                     else:
-                        data_df[count:count + nb_mhe] = np.zeros((1, nb_mhe))
+                        data_df[count : count + nb_mhe] = np.zeros((1, nb_mhe))
                 count += nb_mhe
             for m in interest_muscles:
                 if params[p] == "full" and "full" in trial[i]:
@@ -151,20 +152,22 @@ for p in range(len(params)):
                     ref_muscle_est_onset_range[m] = [(ref_start[m], ref_muscle_est_onset[m])]
 
 emg = pd.DataFrame(
-    {"params": param_df,
-     "data_df": data_df,
-     "names": muscles_names,
-     # "EMG_mhe" : emg_mhe[0, 0:1],
-     # "EMG_ref" : emg_ref[0, 0:1],
-     # "names": ["Full", "MHE", "ref"]
-})
-c=0
+    {
+        "params": param_df,
+        "data_df": data_df,
+        "names": muscles_names,
+        # "EMG_mhe" : emg_mhe[0, 0:1],
+        # "EMG_ref" : emg_ref[0, 0:1],
+        # "names": ["Full", "MHE", "ref"]
+    }
+)
+c = 0
 emg_hm = np.zeros((len(params) * len(muscle_track_idx), nb_mhe))
 for m in range(models[0].nbMuscles()):
     if m in muscle_track_idx:
         idx = muscle_track_idx.index(m)
-        emg_hm[c:c+2, :] = np.concatenate((emg_ref[idx, :][np.newaxis, :], emg_mhe[m, :][np.newaxis, :]), axis=0)
-        c+=2
+        emg_hm[c : c + 2, :] = np.concatenate((emg_ref[idx, :][np.newaxis, :], emg_mhe[m, :][np.newaxis, :]), axis=0)
+        c += 2
 
 
 c = 0
@@ -175,8 +178,8 @@ cbar_kws = [None] * len(muscle_track_idx)
 cbar[-1] = True
 cbar_kws[-1] = {"orientation": "horizontal"}
 for i in range(len(muscle_track_idx)):
-    plt.subplot(len(muscle_track_idx), 1, i+1)
-    ax = sns.heatmap(emg_hm[c:c+2, :], vmin=0, vmax=0.2, cmap=cp)
+    plt.subplot(len(muscle_track_idx), 1, i + 1)
+    ax = sns.heatmap(emg_hm[c : c + 2, :], vmin=0, vmax=0.2, cmap=cp)
     # plt.broken_barh(full_muscle_est_onset_range[i], [2 + count, 1])
     # plt.broken_barh(ref_muscle_est_onset_range[i], [3 + count, 1], color='r')
     c += 2
@@ -198,7 +201,6 @@ plt.show()
 # plt.setp(ax2.get_legend().get_texts(), fontsize="22")  # for legend text
 # plt.setp(ax2.get_legend().get_title(), fontsize="30")  # for legend title
 # plt.title(f"Activation level for abduction", fontsize=20)
-
 
 
 # ridge_plot = sns.FacetGrid(emg, row="names", hue="names", aspect=5, height=1.25)
