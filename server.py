@@ -1,15 +1,17 @@
+"""
+Script to run the server on the acquisition computer using biosiglive package.
+"""
+
 from biosiglive.server import Server
 
 if __name__ == "__main__":
-    server_ip = "127.0.0.1"
+    server_ip = "192.168.1.211"
     server_port = 50000
     read_freq = 100
     n_electrode = 10
-    subject = "Remi"
-    data_dir = "/home/amedeo/Documents/programmation/data_article/Remi/"
-    # data_dir = f"data/test_09_12_21/{subject}/"
+    subject = "Subject_1"
+    data_dir = f"data_final/{subject}/"
     motion = "abd_co"
-    offline_file_path = data_dir + "test_" + motion + "_for_server.mat"
 
     # Run streaming data
     muscles_idx = (0, n_electrode - 1)
@@ -20,19 +22,18 @@ if __name__ == "__main__":
         type="TCP",
         muscle_range=muscles_idx,
         acquisition_rate=read_freq,
-        model_path=data_dir + f"Wu_Shoulder_Model_mod_wt_wrapp_{subject}.bioMod",
+        model_path=data_dir + f"model_{subject}_scaled.bioMod",
         recons_kalman=True,
         output_dir=data_dir,
-        output_file="test_" + motion,
-        offline_file_path=offline_file_path,
+        output_file=motion,
     )
 
     server.run(
         stream_emg=True,
         stream_markers=True,
         stream_imu=False,
-        optim=False,
+        optim=True,
         plot_emg=False,
         norm_emg=False,
-        test_with_connection=False,
+        test_with_connection=True,
     )
