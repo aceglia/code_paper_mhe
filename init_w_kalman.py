@@ -1,3 +1,8 @@
+"""
+Script to scale the opensim model then translate it into biomod file and initialize it with a Kalman filter.
+Data can be live-streamed or prerecorded to avoid the subject waiting.
+"""
+
 try:
     import biorbd
     import bioviz
@@ -55,15 +60,31 @@ def read_sto_mot_file(filename):
     return data
 
 
-def EKF(model_path, scaling=False, off_line=True, mass=None):
+def initialize(model_path: str, scaling: bool = False, off_line: bool = True, mass: int = None):
+    """
+    Initialize the model with a Kalman filter and/or scale it.
+
+    Parameters
+    ----------
+    model_path : str
+        Path of the model to initialize
+    scaling : bool, optional
+        If True, the model will be scaled using opensim. The default is False.
+    off_line : bool, optional
+        If True, the model will be initialized and scaled with prerecorded data. The default is True.
+    mass : int, optional
+        Mass of the subject. The default is None.
+    """
+
     if not off_line:
+        # Stream data from server and store them in an array
         server_ip = "192.168.1.211"
         server_port = 50000
         n_marks = 16
         for i in range(5):
             client = Client(server_ip, server_port, "TCP")
             markers_tmp = client.get_data(
-                ["markers"], nb_frame_of_interest=100, read_frequency=100, nb_of_data_to_export=10, get_names=True
+                ["markers"], read_frequency=100, nb_of_data_to_export=10, get_names=True
             )
             sleep((1 / 100) * 10)
             if i == 0:
@@ -81,8 +102,7 @@ def EKF(model_path, scaling=False, off_line=True, mass=None):
         except:
             markers = mat["markers"][:3, :, :]
 
-    # data_dir = f"/home/amedeo/Documents/programmation/data_article/{subject}"
-
+    # Define the name of the model's markers
     marker_names = [
         "STER",
         "XIPH",
@@ -153,7 +173,20 @@ def EKF(model_path, scaling=False, off_line=True, mass=None):
         b.exec()
 
 
-def convert_model(in_path, out_path, viz=None):
+def convert_model(in_path: str, out_path: str, viz: bool = None):
+    """
+    Convert a model from OpenSim to BioMod format.
+
+    Parameters
+    ----------
+    in_path : str
+        Path of the model to convert
+    out_path : str
+        Path of the converted model
+    viz : bool, optional
+        If True, the model will be visualized using bioviz package. The default is None.
+
+    """
     #  convert_model
     from OsimToBiomod import Converter
 
@@ -171,5 +204,4 @@ if __name__ == "__main__":
     data_dir = f"/home/amedeo/Documents/programmation/data_article/{subject}"
     # model_path = f"{data_dir}/Wu_Shoulder_Model_mod_wt_wrapp_{subject}_scaled.bioMod"
     model_path = f"{data_dir}/Wu_Shoulder_Model_mod_wt_wrapp_{subject}.osim"
-    EKF(model_path, scaling=True, off_line=True, mass=mass)
-    # convert_model(in_path=model_in, out_path=model_out, viz=True)
+    initialize(model_path, scaling=True, off_line=True, mass=mass)

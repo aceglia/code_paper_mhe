@@ -1,4 +1,9 @@
+"""
+This code provides some utility functions for the mhe implementation.
+"""
+
 import numpy as np
+import bioptim
 from biosiglive.data_processing import add_data_to_pickle
 from biosiglive.data_plot import update_plot_force
 from time import strftime
@@ -8,6 +13,10 @@ import os
 
 
 def check_and_adjust_dim(*args):
+    """
+    Check if the dimensions of the arguments are the same.
+    If not, the function will adjust the dimensions to be the same.
+    """
     if len(args) == 1:
         conf = args[0]
     else:
@@ -18,7 +27,22 @@ def check_and_adjust_dim(*args):
     return conf
 
 
-def update_plot(estimator_instance, t, force_est, q_est, init_time=None):
+def update_plot(estimator_instance, force_est: np.ndarray, q_est:np.ndarray, init_time: float = None):
+    """
+    Update the plot of the mhe.
+
+    Parameters
+    ----------
+    estimator_instance: instance of the estimator class
+        The estimator class.
+    force_est: np.ndarray
+        The estimated force.
+    q_est: np.ndarray
+        The estimated joint angles.
+    init_time: float
+        The initial time.
+    """
+
     absolute_delay_plot = 0
     if estimator_instance.data_to_show.count("force") != 0:
         estimator_instance.force_to_plot = np.append(
@@ -58,8 +82,26 @@ def update_plot(estimator_instance, t, force_est, q_est, init_time=None):
     return np.round(absolute_delay_plot, 3)
 
 
-def compute_force(sol, get_force, nbMT, use_excitation=False):
-    force_est = np.zeros((nbMT, 1))
+def compute_force(sol: bioptim.Solution, get_force, nbmt: int, use_excitation : bool = False):
+    """
+    Compute the force.
+
+    Parameters
+    ----------
+    sol: bioptim.Solution
+        The solution of the mhe.
+    get_force: function
+        The function that computes the force.
+    nbmt: int
+        The number of muscles.
+    use_excitation: bool
+        If True, the excitation will be used.
+
+    Returns
+    -------
+    Tuple of the force, joint angles, activation and excitation.
+    """
+    force_est = np.zeros((nbmt, 1))
     q_est = sol.states["q"][:, -2:-1]
     dq_est = sol.states["qdot"][:, -2:-1]
     if use_excitation:
@@ -69,22 +111,43 @@ def compute_force(sol, get_force, nbMT, use_excitation=False):
         a_est = sol.controls["muscles"][:, -2:-1]
         u_est = a_est
 
-    for i in range(nbMT):
+    for i in range(nbmt):
         force_est[i, 0] = get_force(q_est, dq_est, a_est, u_est)[i, :]
     return force_est, q_est, dq_est, a_est, u_est
 
 
 def save_results(
-    data,
-    current_time,
-    kin_data_to_track="markers",
-    track_emg=False,
-    use_torque=True,
-    result_dir=None,
-    file_name=None,
-    file_name_prefix="",
+    data: dict,
+    current_time: float,
+    kin_data_to_track: str = "markers",
+    track_emg: bool = False,
+    use_torque: bool = True,
+    result_dir: bool = None,
+    file_name: bool = None,
+    file_name_prefix: str = "",
 ):
+    """
+    Save the results.
 
+    Parameters
+    ----------
+    data: dict
+        The data to save.
+    current_time: float
+        The current time.
+    kin_data_to_track: str
+        The data to track.
+    track_emg: bool
+        If True, the emg have been tracked.
+    use_torque: bool
+        If True, the torque have been used.
+    result_dir: bool
+        The directory where the results will be saved.
+    file_name: bool
+        The name of the file where the results will be saved.
+    file_name_prefix: str
+        The prefix of the file name.
+    """
     torque = "_torque" if use_torque else ""
     emg = "_EMG_" if track_emg else "_"
     file_name = file_name if file_name else f"Results_mhe_{kin_data_to_track}{emg}{torque}_driven_{current_time}"
@@ -96,7 +159,23 @@ def save_results(
     add_data_to_pickle(data, data_path)
 
 
-def muscle_mapping(muscles_target_tmp, mvc_list, muscle_track_idx):
+def muscle_mapping(muscles_target_tmp: np.ndarray, mvc_list: list, muscle_track_idx: list):
+    """
+    Map the muscles to the right index.
+
+    Parameters
+    ----------
+    muscles_target_tmp: np.ndarray
+        The muscles target.
+    mvc_list: list
+        The list of the mvc.
+    muscle_track_idx: list
+        The list of the muscle index.
+
+    Returns
+    -------
+    The mapped muscles.
+    """
     muscles_target = np.zeros((len(muscle_track_idx), int(muscles_target_tmp.shape[1])))
     muscles_target[[0, 1, 2], :] = muscles_target_tmp[0, :]
     muscles_target[[3], :] = muscles_target_tmp[1, :]
@@ -114,7 +193,25 @@ def muscle_mapping(muscles_target_tmp, mvc_list, muscle_track_idx):
     return muscles_target
 
 
-def interpolate_data(interp_factor, x_ref, muscles_target, markers_target):
+def interpolate_data(interp_factor: int, x_ref: np.ndarray, muscles_target: np.ndarray, markers_target: np.ndarray):
+    """
+    Interpolate the reference and target data.
+
+    Parameters
+    ----------
+    interp_factor: int
+        The interpolation factor.
+    x_ref: np.ndarray
+        The reference x.
+    muscles_target: np.ndarray
+        The reference muscles.
+    markers_target: np.ndarray
+        The reference markers.
+
+    Returns
+    -------
+    Tuple of interpolated data.
+    """
     # interpolate target
     if interp_factor != 1:
         # x_ref

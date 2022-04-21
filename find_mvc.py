@@ -1,3 +1,7 @@
+"""
+Script to find MVCs in real time using the mvc tool provided in biosiglive package.
+"""
+
 from biosiglive.live_mvc import ComputeMvc
 
 if __name__ == "__main__":

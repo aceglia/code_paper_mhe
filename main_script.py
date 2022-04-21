@@ -1,3 +1,7 @@
+"""
+This script is the main script for the project. It is used to run the mhe solver and visualize the estimated data.
+"""
+
 from biosiglive.client import Client
 import multiprocessing as mp
 from mhe.ocp import *
@@ -6,7 +10,18 @@ from biosiglive.data_plot import init_plot_force
 
 
 class MuscleForceEstimator:
+    """
+    This class is used to define the muscle force estimator.
+    """
     def __init__(self, *args):
+        """
+        Initialize the muscle force estimator.
+
+        Parameters
+        ----------
+        args : dict
+            Dictionary of configuration to initialize the estimator.
+        """
         conf = check_and_adjust_dim(*args)
         self.model_path = conf["model_path"]
         biorbd_model = biorbd.Model(self.model_path)
@@ -31,7 +46,7 @@ class MuscleForceEstimator:
         self.muscle_track_idx = []
         self.solver_options = {}
         # define some variables
-        self.var, self.server_ip, self.server_port, self.data_to_show = {}, [], [], []
+        self.var, self.server_ip, self.server_port, self.data_to_show = {}, None, None, []
 
         # multiprocess stuffs
         manager = mp.Manager()
@@ -60,9 +75,13 @@ class MuscleForceEstimator:
         self.markers_target, self.muscles_target, self.x_ref, self.kin_target = None, None, None, None
         self.n_loop = 0
         self.mhe, self.solver, self.get_force, self.force_est = None, None, None, None
+        self.model = None
+        self.b = None
 
+        # Use the configuration dictionary to initialize the muscle force estimator parameters
         for key in conf.keys():
             self.__dict__[key] = conf[key]
+
         self.T_mhe = self.mhe_time
         self.ns_mhe = int(self.T_mhe * self.markers_rate * self.interpol_factor)
         self.slide_size = int(((self.markers_rate * self.interpol_factor) / self.exp_freq))
@@ -84,6 +103,10 @@ class MuscleForceEstimator:
             self.dof_names.append(biorbd_model.nameDof()[i].to_string())
 
     def prepare_problem_init(self):
+        """
+        Prepare the mhe problem.
+        """
+
         biorbd_model = biorbd.Model(self.model_path)
         self.data_to_get = []
         self.data_to_get.append("markers")
@@ -99,13 +122,12 @@ class MuscleForceEstimator:
             self.offline_data = [x_ref, markers_target, muscles_target]
 
         else:
-            nb_of_data = self.ns_mhe + 1  # if t == 0 else 2
+            nb_of_data = int(self.ns_mhe / self.interpol_factor) + 1
             vicon_client = Client(self.server_ip, self.server_port, type="TCP")
             data = vicon_client.get_data(
                 self.data_to_get,
                 read_frequency=self.markers_rate,
                 nb_of_data_to_export=nb_of_data,
-                nb_frame_of_interest=self.ns_mhe,
                 get_names=self.get_names,
                 get_kalman=self.get_kalman,
             )
@@ -127,33 +149,14 @@ class MuscleForceEstimator:
                                              mvc_list=mvc_list,
                                              muscle_track_idx=self.muscle_track_idx
                                              )[:, :window_len]
-
-        if self.use_torque:
-            nbGT = biorbd_model.nbQ()
-        else:
-            nbGT = 0
-
-        if u0 is None:
-            u0 = np.ones((biorbd_model.nbMuscles() + nbGT, window_len)) * 0.1
-            c = 0
-            for i in range(biorbd_model.nbQ(), biorbd_model.nbMuscles() + nbGT):
-                if c in self.muscle_track_idx:
-                    idx = self.muscle_track_idx.index(c)
-                    u0[c, :] = self.muscles_target[idx, :]
-                    c += 1
-
         self.kin_target = (
             self.markers_target[:, :, : window_len + 1]
             if self.kin_data_to_track == "markers"
             else self.x_ref[: self.nbQ, : window_len + 1]
         )
-        # if is_mhe:
-        #     self.x_ref = self.x_ref[:, : window_len + 1]
-
         for i in range(biorbd_model.nbMuscles()):
             self.muscle_names.append(biorbd_model.muscleNames()[i].to_string())
 
-        # Warm start for the full ocp
         objectives = define_objective(
             weights=self.weights,
             use_torque=self.use_torque,
@@ -181,31 +184,61 @@ class MuscleForceEstimator:
         self.force_est = np.ndarray((biorbd_model.nbMuscles(), 1))
 
     def get_data(self):
+        """
+        Get data from the vicon server.
+
+        Returns
+        -------
+        Asked data
+        """
         data_to_get = self.data_to_get
-        nb_of_data = self.ns_mhe + 1  # if t == 0 else 2
+        nb_of_data = self.ns_mhe + 1
         vicon_client = Client(self.server_ip, self.server_port, type="TCP")
         data = vicon_client.get_data(
             data_to_get,
             read_frequency=self.exp_freq,
             nb_of_data_to_export=nb_of_data,
-            nb_frame_of_interest=self.ns_mhe,
             get_names=self.get_names,
             get_kalman=self.get_kalman,
         )
         return data
 
     def run(
-        self, var, server_ip, server_port, data_to_show=None, test_offline=False, offline_file=None
+            self,
+            var: dict,
+            server_ip: str,
+            server_port: int,
+            data_to_show: list = None,
+            test_offline: bool = False,
+            offline_file: str = None
     ):
+        """
+        Run the whole multiprocess program.
+
+        Parameters
+        ----------
+        var : dict
+            Dictionary containing the parameters of the problem.
+        server_ip : str
+            IP of the vicon server.
+        server_port : int
+            Port of the vicon server.
+        data_to_show : list, optional
+            List of data to show. The default is None.
+        test_offline : bool, optional
+            If True, the program will run in offline mode. The default is False.
+        offline_file : str, optional
+            Path to the offline file. The default is None.
+        """
         self.var = var
         self.server_ip = server_ip
         self.server_port = server_port
         self.data_to_show = data_to_show
         self.test_offline = test_offline
         self.offline_file = offline_file
+        proc_plot = None
         if self.test_offline and not self.offline_file:
             raise RuntimeError("Please provide a data file to run offline program")
-        proc_plot = []
 
         if self.data_to_show:
             proc_plot = self.process(name="plot", target=MuscleForceEstimator.run_plot, args=(self,))
@@ -220,6 +253,10 @@ class MuscleForceEstimator:
         proc_mhe.join()
 
     def run_plot(self):
+        """
+        Run the plot function.
+        """
+        data = None
         for data_to_show in self.data_to_show:
             if data_to_show == "force":
                 self.p_force, self.win_force, self.app_force = init_plot_force(self.nbMT)
@@ -247,17 +284,27 @@ class MuscleForceEstimator:
             try:
                 data = self.plot_queue.get_nowait()
                 is_working = True
-            except:
+            except mp.Queue.queue.Empty:
                 is_working = False
 
             if is_working:
                 plot_delay = update_plot(
-                    self, data["t"], data["force_est"], data["q_est"], init_time=data["init_time_frame"]
+                    self, data["force_est"], data["q_est"], init_time=data["init_time_frame"]
                 )
                 dic = {"plot_delay": plot_delay}
                 save_results(dic, self.current_time, result_dir=self.result_dir, file_name_prefix="plot_delay_")
 
-    def run_mhe(self, var, data_to_show):
+    def run_mhe(self, var: dict, data_to_show: list):
+        """
+        Run the mhe solver.
+
+        Parameters
+        ----------
+        var : dict
+            Dictionary containing the parameters of the problem.
+        data_to_show : list
+            List of data to show.
+        """
         self.prepare_problem_init()
         if data_to_show:
             self.plot_event.wait()
@@ -270,7 +317,7 @@ class MuscleForceEstimator:
         self.model = biorbd.Model(self.model_path)
         initial_time = time()
 
-        final_sol = self.mhe.solve(
+        self.mhe.solve(
             lambda mhe, i, sol: update_mhe(
                 mhe,
                 i,
@@ -282,70 +329,28 @@ class MuscleForceEstimator:
             export_options={"frame_to_export": self.ns_mhe - 1},
             solver=self.solver,
         )
-        # final_sol.graphs()
 
 
 if __name__ == "__main__":
-    # mvc_list = [0.00022255, 0.00022255, 0.00022255,  # Remi
-    #             0.00064176,
-    #             0.00029489,
-    #             0.00063796,
-    #             0.00081127, 0.00081127,
-    #             0.00016129, 0.00016129, 0.00016129,
-    #             0.00065126,
-    #             0.00034388,
-    #             0.00024886,
-    #             0.00013451
-    #             ]
-    # mvc_list = [0.00021133, 0.00021133 , 0.00021133 ,  # Mathis
-    #             0.00055241,
-    #             0.00016541 ,
-    #             0.00023318,
-    #             0.0007307 , 0.0007307 ,
-    #             0.00025902, 0.00025902, 0.00025902,
-    #             0.00039303,
-    #             0.000239,
-    #             # 0.00045,
-    #             0.00010913
-    #             ]
-    # mvc_list = [0.00011193,0.00011193,0.00011193,
-    #  0.00195273,
-    #  0.0004393,
-    #  0.00044208,
-    #  0.00081404,0.00081404,
-    #  0.00019145,0.00019145,0.00019145,
-    #  0.00448458,
-    #  0.00171529,
-    #  0.00134165,
-    #  0.00020328]
-
-    scaled = True
-    scal = "_scaled" if scaled else ""
-    subject = f"Clara"
-    data_dir = f"/home/amedeo/Documents/programmation/data_article/{subject}/"
+    subject = f"subject_2"
+    data_dir = f"/home/amedeo/Documents/programmation/data_article/data_final/{subject}/"
 
     mvc = sio.loadmat(data_dir + f"MVC_{subject}.mat")["MVC_list_max"][0]
     mvc_list = [
-        mvc[0],
-        mvc[0],
-        mvc[0],
-        mvc[1],
-        mvc[2],
-        mvc[3],
-        mvc[4],
-        mvc[4],
-        mvc[5],
-        mvc[5],
-        mvc[5],
-        mvc[6],
-        mvc[7],
-        mvc[8],
-        mvc[9],
+        mvc[0], mvc[0], mvc[0],  # MVC Pectoralis sternalis
+        mvc[1],  # MVC Deltoid anterior
+        mvc[2],  # MVC Deltoid medial
+        mvc[3],  # MVC Deltoid posterior
+        mvc[4], mvc[4],  # MVC Biceps brachii
+        mvc[5], mvc[5], mvc[5],  # MVC Triceps brachii
+        mvc[6],  # MVC Trapezius superior
+        mvc[7],  # MVC Trapezius medial
+        mvc[8],  # MVC Trapezius inferior
+        mvc[9],  # MVC Latissimus dorsi
     ]
 
     result_dir = data_dir
-    # trials = ["abd", "abd_cocon", "flex", "flex_cocon", "cycl","cycl_cocon"]  # , "abd_1_rep", "flex_1_rep", "flex_cocon_1_rep"]
-    trials = ["abd"]
+    trials = ["abd", "flex", "cycl"]
     configs = ["mhe"]  # , "mhe"]
 
     for config in configs:
@@ -357,28 +362,26 @@ if __name__ == "__main__":
                 "nlp_solver_step_length": 0.5,
                 "levenberg_marquardt": 100.0,
             }
-            configuration_dic = {"model_path": data_dir + f"Wu_Shoulder_Model_mod_wt_wrapp_{subject}{scal}.bioMod",
+            configuration_dic = {"model_path": data_dir + f"model_{subject}_scaled.bioMod",
                                  "mhe_time": 0.1,
                                  "interpol_factor": 2,
-                                 "torque_driven": False,
                                  "use_torque": False,
                                  "save_results": True,
                                  "track_emg": True,
-                                 "init_w_kalman": False,
                                  "kin_data_to_track": "markers",
                                  "mvc_list": mvc_list,
                                  "exp_freq": 32,
                                  "muscle_track_idx": [
-                                     14, 25, 26,  # PEC
-                                     13,  # DA
-                                     15,  # DM
-                                     21,  # DP
-                                     23, 24,  # bic
-                                     28, 29, 30,  # tri
-                                     10,  # TRAPsup
-                                     2,  # TRAPmed
-                                     3,  # TRAPinf
-                                     27,  # Lat
+                                     14, 25, 26,  # MVC Pectoralis sternalis
+                                     13,  # MVC Deltoid anterior
+                                     15,  # MVC Deltoid medial
+                                     21,  # MVC Deltoid posterior
+                                     23, 24,  # MVC Biceps brachii
+                                     28, 29, 30,  # MVC Triceps brachii
+                                     10,  # MVC Trapezius superior
+                                     2,  # MVC Trapezius medial
+                                     3,  # MVC Trapezius inferior
+                                     27,  # MVC Latissimus dorsi
                                  ],
                                  "result_dir": result_dir,
                                  "result_file_name": file_name,
@@ -386,7 +389,7 @@ if __name__ == "__main__":
                                  "weights": configure_weights()
                                  }
 
-            variables_dic = {"print_lvl": 1}
+            variables_dic = {"print_lvl": 1}  # print level 0 = no print, 1 = print information
 
             # data_to_show = ["force", "q"]
             data_to_show = None

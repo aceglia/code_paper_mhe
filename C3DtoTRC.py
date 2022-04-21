@@ -1,9 +1,16 @@
+"""
+Script to convert C3D files to TRC files. Used in the scaling stage.
+"""
+
 import numpy as np
 from pyomeca import Markers
 import csv
 
 
 class WriteTrc:
+    """
+    Class to write TRC files.
+    """
     def __init__(self):
         self.output_file_path = None
         self.input_file_path = None
@@ -18,6 +25,13 @@ class WriteTrc:
         self.time = None
 
     def _prepare_trc(self):
+        """
+        Prepare the headers for the TRC file.
+
+        Returns
+        -------
+        headers : list
+        """
         headers = [
             ["PathFileType", 4, "(X/Y/Z)", self.output_file_path],
             [
@@ -69,6 +83,9 @@ class WriteTrc:
         return headers
 
     def write_trc(self):
+        """
+        Write the TRC file.
+        """
         if self.input_file_path:
             self._read_c3d()
         headers = self._prepare_trc()
@@ -85,6 +102,9 @@ class WriteTrc:
             writer.writerows(headers)
 
     def _read_c3d(self):
+        """
+        Read the C3D file.
+        """
         data = Markers.from_c3d(self.input_file_path, usecols=self.channels)
         self.markers = data.values[:3, :, :]
         self.n_frames = len(data.time.values)
@@ -97,16 +117,38 @@ class WriteTrc:
 
 
 class WriteTrcFromC3d(WriteTrc):
+    """
+    Class to write TRC files from C3D files.
+    """
     def __init__(
         self,
-        output_file_path,
-        c3d_file_path,
-        data_rate=None,
-        cam_rate=None,
-        n_frames=None,
-        start_frame=1,
-        c3d_channels=None,
+        output_file_path: str,
+        c3d_file_path: str,
+        data_rate: int = None,
+        cam_rate: int = None,
+        n_frames: int = None,
+        start_frame: int = 1,
+        c3d_channels: list = None,
     ):
+        """
+        Parameters
+        ----------
+        output_file_path : str
+            Path to the output TRC file.
+        c3d_file_path : str
+            Path to the C3D file.
+        data_rate : int, optional
+            Data rate of the C3D file.
+        cam_rate : int, optional
+            Camera rate of the C3D file.
+        n_frames : int, optional
+            Number of frames of the C3D file.
+        start_frame : int, optional
+            Start frame of the C3D file.
+        c3d_channels : list, optional
+            List of channels to be extracted from the C3D file.
+        """
+
         super(WriteTrcFromC3d, self).__init__()
         self.input_file_path = c3d_file_path
         self.output_file_path = output_file_path
@@ -121,17 +163,41 @@ class WriteTrcFromC3d(WriteTrc):
 
 
 class WriteTrcFromMarkersData(WriteTrc):
+    """
+    Class to write TRC files from markers data.
+    """
     def __init__(
         self,
-        output_file_path,
-        markers=None,
-        marker_names=None,
-        data_rate=None,
-        cam_rate=None,
-        n_frames=None,
-        start_frame=1,
-        units="m",
+        output_file_path: str,
+        markers: np.ndarray = None,
+        marker_names: list = None,
+        data_rate: int = None,
+        cam_rate: int = None,
+        n_frames: int = None,
+        start_frame: int = 1,
+        units: str = "m",
     ):
+        """
+
+        Parameters
+        ----------
+        output_file_path : str
+            Path to the output TRC file.
+        markers : np.ndarray, optional
+            Markers data.
+        marker_names : list, optional
+            List of marker names.
+        data_rate : int, optional
+            Data rate of the markers' data.
+        cam_rate : int, optional
+            Camera rate of the markers' data.
+        n_frames : int, optional
+            Number of frames of the markers' data.
+        start_frame : int, optional
+            Start frame of the markers' data.
+        units : str, optional
+            Units of the markers' data ("m" or "mm").
+        """
         super(WriteTrcFromMarkersData, self).__init__()
         self.output_file_path = output_file_path
         self.markers = markers
@@ -148,8 +214,6 @@ class WriteTrcFromMarkersData(WriteTrc):
 
 
 if __name__ == "__main__":
-    # outfile_path = "data.trc"
-    # infile_path = "data.c3d"
-    outfile_path = "data/test_09_12_21/Jules/abd.trc"
-    infile_path = "data/test_09_12_21/Jules/abd.c3d"
+    outfile_path = "data.trc"
+    infile_path = "data.c3d"
     WriteTrcFromC3d(output_file_path=outfile_path, c3d_file_path=infile_path).write()

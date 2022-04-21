@@ -1,7 +1,10 @@
+"""
+This code provide every function needed to solve the OCP problem.
+"""
+import bioptim
 from .utils import *
 from time import time, sleep
 import biorbd_casadi as biorbd
-from scipy import interpolate
 from biosiglive.data_processing import read_data
 import numpy as np
 import datetime
@@ -18,17 +21,33 @@ from bioptim import (
     InitialGuess,
     InterpolationType,
     Solver,
-    Bounds,
     Node,
-    OptimalControlProgram,
-    ParameterList,
-    Shooting,
-    SolutionIntegrator,
-    OdeSolver,
 )
 
 
-def muscle_forces(q, qdot, act, controls, model, use_excitation=False):
+def muscle_forces(q: np.ndarray, qdot: np.ndarray, act: np.ndarray, controls: np.ndarray, model: biorbd.Model, use_excitation: bool = False):
+    """
+    Compute the muscle force for a given state and controls.
+
+    Parameters
+    ----------
+    q : np.ndarray
+        State of the model.
+    qdot : np.ndarray
+        State of the model.
+    act : np.ndarray
+        Activation of the muscles.
+    controls : np.ndarray
+        Controls of the model.
+    model : biorbd.Model
+        Model of the system.
+    use_excitation : bool
+        If True, use the excitation of the muscles.
+
+    Returns
+    -------
+    Muscle force.
+    """
     muscles_states = model.stateSet()
     for k in range(model.nbMuscles()):
         if use_excitation is not True:
@@ -40,8 +59,21 @@ def muscle_forces(q, qdot, act, controls, model, use_excitation=False):
     return muscles_force
 
 
-# Return biorbd muscles force function
-def force_func(biorbd_model, use_excitation=False):
+def force_func(biorbd_model: biorbd.Model, use_excitation: bool = False):
+    """
+    Define the casadi function that compute the muscle force.
+
+    Parameters
+    ----------
+    biorbd_model : biorbd.Model
+        Model of the system.
+    use_excitation : bool
+        If True, use the excitation of the muscles.
+
+    Returns
+    -------
+    Casadi function that compute the muscle force.
+    """
     qMX = MX.sym("qMX", biorbd_model.nbQ(), 1)
     dqMX = MX.sym("dqMX", biorbd_model.nbQ(), 1)
     aMX = MX.sym("aMX", biorbd_model.nbMuscles(), 1)
@@ -55,7 +87,19 @@ def force_func(biorbd_model, use_excitation=False):
     ).expand()
 
 
-def get_reference_data(file_path):
+def get_reference_data(file_path: str):
+    """
+    Get the reference data from a .mat file or pickle file. Keys must be well define to be found.
+
+    Parameters
+    ----------
+    file_path : str
+        Path to the file.
+
+    Returns
+    -------
+    Reference data.
+    """
     if file_path[-4:] == ".mat":
         mat = sio.loadmat(file_path)
         x_ref, markers, muscles = mat["kalman"], mat["markers"], mat["emg_proc"]
@@ -71,15 +115,41 @@ def get_reference_data(file_path):
 
 
 def define_objective(
-    weights,
-    use_torque,
-    track_emg,
-    muscles_target,
-    kin_target,
-    biorbd_model,
-    kin_data_to_track="markers",
-    muscle_track_idx=(),
+    weights: dict,
+    use_torque: bool,
+    track_emg: bool,
+    muscles_target: np.ndarray,
+    kin_target: np.ndarray,
+    biorbd_model: biorbd.Model,
+    kin_data_to_track: str = "markers",
+    muscle_track_idx: list = (),
 ):
+    """
+    Define the objective function of the OCP.
+
+    Parameters
+    ----------
+    weights : dict
+        Weights of the different terms.
+    use_torque : bool
+        If True, use the torque are used in the dynamics.
+    track_emg : bool
+        If True, track the EMG are tracked.
+    muscles_target : np.ndarray
+        Target of the muscles.
+    kin_target : np.ndarray
+        Target for kinematics objective.
+    biorbd_model : biorbd.Model
+        Model of the system.
+    kin_data_to_track : str
+        Kind of kinematics data to track ("markers" or "q").
+    muscle_track_idx : list
+        Index of the muscles to track.
+
+    Returns
+    -------
+    Objective function.
+    """
     muscle_min_idx = []
     for i in range(biorbd_model.nbMuscles()):
         if i not in muscle_track_idx:
@@ -164,24 +234,53 @@ def define_objective(
 
 
 def prepare_problem(
-    model_path,
-    objectives,
-    window_len,
-    window_duration,
-    x0,
-    u0=None,
-    use_torque=False,
-    nb_threads=8,
-    solver_options={},
-    use_acados=True,
+    model_path: str,
+    objectives: ObjectiveList,
+    window_len: int,
+    window_duration: float,
+    x0: np.ndarray,
+    u0: np.ndarray = None,
+    use_torque: bool = False,
+    nb_threads: int = 8,
+    solver_options: dict = None,
+    use_acados: bool = False,
 
 ):
-    # Model path
+    """
+    Prepare the ocp problem and the solver to use
 
+    parameters
+    -----------
+    model_path : str
+        Path to the model
+    objectives : ObjectiveList
+        List of objectives
+    window_len : int
+        Length of the window
+    window_duration : float
+        Duration of the window
+    x0 : np.ndarray
+        Initial state
+    u0 : np.ndarray
+        Initial control
+    use_torque : bool
+        Use torque as control
+    nb_threads : int
+        Number of threads to use
+    solver_options : dict
+        Solver options
+    use_acados : bool
+        Use acados solver
+
+    Returns
+    -------
+    The problem and the solver.
+    """
     biorbd_model = biorbd.Model(model_path)
     nbGT = biorbd_model.nbGeneralizedTorque() if use_torque else 0
     tau_min, tau_max, tau_init = -100, 100, 0
     muscle_min, muscle_max, muscle_init = 0, 1, 0.01
+
     # Dynamics
     dynamics = DynamicsList()
     dynamics.add(DynamicsFcn.MUSCLE_DRIVEN,
@@ -193,8 +292,8 @@ def prepare_problem(
     x_bounds = BoundsList()
     x_bounds.add(bounds=QAndQDotBounds(biorbd_model))
 
-    x_bounds[0].min[biorbd_model.nbQ() :, :] = [[-100] * 3] * biorbd_model.nbQ()
-    x_bounds[0].max[biorbd_model.nbQ() :, :] = [[100] * 3] * biorbd_model.nbQ()
+    x_bounds[0].min[:, :] = [[-200] * 3] * biorbd_model.nbQ() * 2
+    x_bounds[0].max[:, :] = [[200] * 3] * biorbd_model.nbQ() * 2
 
     # Control path constraint
     u_bounds = BoundsList()
@@ -208,7 +307,11 @@ def prepare_problem(
         np.concatenate((x0[:, : window_len + 1], np.zeros((x0.shape[0], window_len + 1)))),
         interpolation=InterpolationType.EACH_FRAME,
     )
-    u_init = InitialGuess(u0[:, : window_len], interpolation=InterpolationType.EACH_FRAME)
+    if u0 is None:
+        u0 = np.array([tau_init] * nbGT + [muscle_init] * biorbd_model.nbMuscles())
+        u_init = InitialGuess(np.tile(u0, (window_len, 1)).T, interpolation=InterpolationType.EACH_FRAME)
+    else:
+        u_init = InitialGuess(u0[:, : window_len], interpolation=InterpolationType.EACH_FRAME)
 
     problem = CustomMhe(
         biorbd_model=biorbd_model,
@@ -234,10 +337,8 @@ def prepare_problem(
         solver.set_convergence_tolerance([1e-5, 1e-5, 1e-5, 1e-5])
         solver.set_integrator_type("IRK")
         solver.set_qp_solver("PARTIAL_CONDENSING_HPIPM")
-
         solver.set_nlp_solver_type("SQP_RTI")
         solver.set_print_level(0)
-        solver.set_maximum_iterations(100)
         for key in solver_options.keys():
             solver.set_option(val=solver_options[key], name=key)
         solver.set_sim_method_num_steps(1)
@@ -246,6 +347,14 @@ def prepare_problem(
 
 
 def configure_weights():
+    """
+    Configure the weights for the objective functions
+
+    Returns
+    -------
+    weights : dict
+        Dictionary of weights
+    """
     weights = {
         "track_markers": 10000000,
         "track_q": 100000,
@@ -257,33 +366,54 @@ def configure_weights():
         "track_emg": 500000,
         "min_control_tot": 10,
     }
-    # weights = {
-    #     "track_markers": 100000000,
-    #     "track_q": 100000,
-    #     "min_control": 50000,
-    #     "min_dq": 10,
-    #     "min_q": 1,
-    #     "min_torque": 10000,
-    #     "min_act": 1,
-    #     "track_emg": 50000,
-    #     "min_control_tot": 10,
-    #     }
     return weights
 
 
 def get_target(
     mhe,
-    t,
-    x_ref,
-    markers_ref,
-    muscles_ref,
-    ns_mhe,
-    slide_size,
-    track_emg,
-    kin_data_to_track,
-    model,
-    offline,
+    t: float,
+    x_ref: np.ndarray,
+    markers_ref: np.ndarray,
+    muscles_ref: np.ndarray,
+    ns_mhe: int,
+    slide_size: int,
+    track_emg: bool,
+    kin_data_to_track: str,
+    model: biorbd.Model,
+    offline: bool,
 ):
+    """
+    Get the target for the next MHE problem and the objective functions index.
+
+    Parameters
+    ----------
+    mhe : CustomMhe
+        The MHE problem
+    t : float
+        The current time
+    x_ref : np.ndarray
+        The reference state
+    markers_ref : np.ndarray
+        The reference markers
+    muscles_ref : np.ndarray
+        The reference muscles
+    ns_mhe : int
+        The number of node of the MHE problem
+    slide_size : int
+        The size of the sliding window
+    track_emg : bool
+        Whether to track EMG
+    kin_data_to_track : str
+        The kin_data to track
+    model : biorbd.Model
+        The model
+    offline : bool
+        Whether to use offline data
+
+    Returns
+    -------
+    Dictionary of targets (values and objective functions index)
+    """
     nbMT, nbQ = model.nbMuscles(), model.nbQ()
     muscles_ref = muscles_ref if track_emg is True else np.zeros((nbMT, ns_mhe))
     q_target_idx, markers_target_idx, muscles_target_idx = [], [], []
@@ -328,7 +458,30 @@ def get_target(
     return target
 
 
-def update_mhe(mhe, t, sol, estimator_instance, initial_time, offline_data=None):
+def update_mhe(mhe, t: int, sol: bioptim.Solution, estimator_instance, initial_time: float, offline_data: bool = None):
+    """
+    Update the MHE problem with the current data.
+
+    Parameters
+    ----------
+    mhe : CustomMhe
+        The MHE problem
+    t : int
+        The current time
+    sol : bioptim.Solution
+        The solution of the previous problem
+    estimator_instance : instance of the estimator class
+        The estimator instance
+    initial_time : float
+        The initial time
+    offline_data : bool
+        Whether to use offline data
+
+    Returns
+    -------
+    if online : True
+    else : True if there are still target available, False otherwise
+    """
     tic = time()
     # target to save
     x_ref_to_save = []
@@ -537,8 +690,10 @@ def update_mhe(mhe, t, sol, estimator_instance, initial_time, offline_data=None)
 
 
 class CustomMhe(MovingHorizonEstimator):
+    """
+    Class for the custom MHE.
+    """
     def __init__(self, **kwargs):
-
         self.init_w_kalman = False
         self.x_ref = None
         self.muscles_ref = None
@@ -547,15 +702,24 @@ class CustomMhe(MovingHorizonEstimator):
 
         super(CustomMhe, self).__init__(**kwargs)
 
-    def advance_window(self, sol, steps: int = 0, **advance_options):
+    def advance_window(self, sol: bioptim.Solution, steps: int = 0, **advance_options):
+        """
+        Custom function that allows to move forward for more than 1 value
+        for advance the window of the MHE used in bioptim.
+
+        Parameters
+        ----------
+        sol : bioptim.Solution
+            Solution of the MHE.
+        steps : int, optional
+            Number of steps to advance the window. The default is 0.
+        advance_options : dict, optional
+            Options for the advance of the window. The default is {}.
+        """
+
         x = sol.states["all"]
         u = sol.controls["all"][:, :-1]
-        if self.init_w_kalman:
-            x0 = np.hstack((x[:, self.slide_size :], self.x_ref[:, -self.slide_size :]))
-        else:
-            x0 = np.hstack(
-                (x[:, self.slide_size :], x[:, -self.slide_size :])
-            )  # discard oldest estimate of the window, duplicates youngest
+        x0 = np.hstack((x[:, self.slide_size :], x[:, -self.slide_size :]))
         u0 = np.hstack((u[:, self.slide_size :], u[:, -self.slide_size :]))
         x_init = InitialGuess(x0, interpolation=InterpolationType.EACH_FRAME)
         u_init = InitialGuess(u0, interpolation=InterpolationType.EACH_FRAME)
