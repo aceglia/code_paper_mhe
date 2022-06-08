@@ -1,12 +1,14 @@
 """
 This script is the main script for the project. It is used to run the mhe solver and visualize the estimated data.
 """
+import os.path
+import shutil
 
-from biosiglive.client import Client
+from biosiglive.streaming.client import Client
 import multiprocessing as mp
 from mhe.ocp import *
 from mhe.utils import *
-from biosiglive.data_plot import init_plot_force
+from biosiglive.gui.plot import LivePlot
 
 
 class MuscleForceEstimator:
@@ -78,6 +80,7 @@ class MuscleForceEstimator:
         self.mhe, self.solver, self.get_force, self.force_est = None, None, None, None
         self.model = None
         self.b = None
+        self.frame_to_save = 0
 
         # Use the configuration dictionary to initialize the muscle force estimator parameters
         for key in conf.keys():
@@ -86,6 +89,7 @@ class MuscleForceEstimator:
         self.T_mhe = self.mhe_time
         self.ns_mhe = int(self.T_mhe * self.markers_rate * self.interpol_factor)
         self.slide_size = int(((self.markers_rate * self.interpol_factor) / self.exp_freq))
+        # self.slide_size = 1
         self.nbQ, self.nbMT = biorbd_model.nbQ(), biorbd_model.nbMuscles()
         self.nbGT = biorbd_model.nbGeneralizedTorque() if self.use_torque else 0
         self.current_time = strftime("%Y%m%d-%H%M")
@@ -115,13 +119,6 @@ class MuscleForceEstimator:
         u0 = None
         if self.test_offline:
             x_ref, markers_target, muscles_target = get_reference_data(self.offline_file)
-            self.final_n = -1 if not self.final_n else self.final_n
-            x_ref, markers_target, muscles_target = (
-                x_ref[:, self.init_n : self.final_n],
-                markers_target[:, :, self.init_n : self.final_n],
-                muscles_target[:, self.init_n : self.final_n],
-            )
-
             self.offline_data = [x_ref, markers_target, muscles_target]
 
         else:
@@ -141,7 +138,6 @@ class MuscleForceEstimator:
 
         window_len = self.ns_mhe
         window_duration = self.T_mhe
-
         self.x_ref, self.markers_target, muscles_target = interpolate_data(
             self.interpol_factor, x_ref, muscles_target, markers_target
         )
@@ -152,10 +148,12 @@ class MuscleForceEstimator:
         self.kin_target = (
             self.markers_target[:, :, : window_len + 1]
             if self.kin_data_to_track == "markers"
-            else self.x_ref[: self.nbQ, : window_len + 1]
+            else self.x_ref[:self.nbQ, : window_len + 1]
         )
+
         for i in range(biorbd_model.nbMuscles()):
             self.muscle_names.append(biorbd_model.muscleNames()[i].to_string())
+        previous_sol = np.concatenate((self.x_ref[:, : window_len + 1], np.zeros((self.x_ref.shape[0], window_len + 1))))
 
         objectives = define_objective(
             weights=self.weights,
@@ -164,6 +162,7 @@ class MuscleForceEstimator:
             muscles_target=self.muscles_target,
             kin_target=self.kin_target,
             biorbd_model=biorbd_model,
+            previous_sol=previous_sol,
             kin_data_to_track=self.kin_data_to_track,
             muscle_track_idx=self.muscle_track_idx,
         )
@@ -257,7 +256,7 @@ class MuscleForceEstimator:
         data = None
         for data_to_show in self.data_to_show:
             if data_to_show == "force":
-                self.p_force, self.win_force, self.app_force = init_plot_force(self.nbMT)
+                self.p_force, self.win_force, self.app_force = LivePlot.init_plot_windows(self.nbMT)
 
             if data_to_show == "q":
                 import bioviz
@@ -302,6 +301,8 @@ class MuscleForceEstimator:
         data_to_show : list
             List of data to show.
         """
+        if os.path.isdir("c_generated_code"):
+            shutil.rmtree("c_generated_code")
         self.prepare_problem_init()
         if data_to_show:
             self.plot_event.wait()
@@ -314,17 +315,54 @@ class MuscleForceEstimator:
         self.model = biorbd.Model(self.model_path)
         initial_time = time()
 
-        self.mhe.solve(
+        sol = self.mhe.solve(
             lambda mhe, i, sol: update_mhe(
                 mhe, i, sol, self, initial_time=initial_time, offline_data=self.offline_data
             ),
-            export_options={"frame_to_export": self.ns_mhe - 1},
+            export_options={"frame_to_export": self.frame_to_save},
             solver=self.solver,
         )
 
+        import matplotlib.pyplot as plt
+        q_est = sol.states["q"][:, :]
+        qdot_est = sol.states["qdot"][:, :]
+        qdot_dif = np.copy(qdot_est)
+
+        kalman = self.mhe.kalman
+        def finite_difference(data):
+            t = np.linspace(0, data.shape[0] / 100, data.shape[0])
+            y = data
+            dydt = np.gradient(y, t)
+            return dydt
+        for i in range(qdot_est.shape[0]):
+            qdot_dif[i, :] = finite_difference(q_est[i, :])
+
+        plt.figure("q_dot")
+        # t_est = np.linspace(0, q_est.shape[1]/35, q_est.shape[1])
+        # t = np.linspace(0, kalman.shape[1]/100, kalman.shape[1])
+
+        for i in range(9):
+            plt.subplot(3, 3, i + 1)
+            plt.plot(qdot_est[i, :] * 180 / np.pi, label="qdot_est")
+            plt.plot(qdot_dif[i, :] * 180 / np.pi, label="qdot_dif")
+            # plt.plot(t, qdot[i, :] * 180 / np.pi, label="qdotkalman")
+            # plt.title(model.nameDof()[i].to_string())
+
+        plt.figure("q")
+        for i in range(9):
+            plt.subplot(3, 3, i + 1)
+            plt.plot(q_est[i, :] * 180 / np.pi, label="q_est")
+            # plt.plot(kalman[i, :] * 180 / np.pi, label="kalman")
+            # plt.plot(self.x_ref[i, :] * 180 / np.pi, label="x_ref")
+            # plt.plot(t, qdot[i, :] * 180 / np.pi, label="qdotkalman")
+            # plt.title(model.nameDof()[i].to_string())
+        plt.legend()
+        sol.graphs()
+        plt.show()
+
 
 if __name__ == "__main__":
-    subject = f"subject_2"
+    subject = f"subject_1"
     data_dir = f"data_final/{subject}/"
 
     mvc = sio.loadmat(data_dir + f"MVC_{subject}.mat")["MVC_list_max"][0]
@@ -347,14 +385,16 @@ if __name__ == "__main__":
     ]
 
     result_dir = data_dir
-    trials = ["abd", "flex", "cycl"]
+    trials = ["abd"]
     configs = ["mhe"]  # , "mhe"]
 
     for config in configs:
         for trial in trials:
             offline_path = result_dir + f"{trial}"
-            file_name = f"{trial}_result"
+            file_name = f"{trial}_result_test"
             solver_options = {"sim_method_jac_reuse": 1, "nlp_solver_step_length": 0.5, "levenberg_marquardt": 100.0}
+            # solver_options = {}
+
             configuration_dic = {
                 "model_path": data_dir + f"model_{subject}_scaled.bioMod",
                 "mhe_time": 0.1,
@@ -362,9 +402,9 @@ if __name__ == "__main__":
                 "use_torque": False,
                 "save_results": True,
                 "track_emg": True,
-                "kin_data_to_track": "markers",
+                "kin_data_to_track": "q",
                 "mvc_list": mvc_list,
-                "exp_freq": 32,
+                "exp_freq": 35,
                 "muscle_track_idx": [
                     14,
                     25,
@@ -386,6 +426,7 @@ if __name__ == "__main__":
                 "result_file_name": file_name,
                 "solver_options": solver_options,
                 "weights": configure_weights(),
+                "frame_to_save": 0,
             }
 
             variables_dic = {"print_lvl": 1}  # print level 0 = no print, 1 = print information

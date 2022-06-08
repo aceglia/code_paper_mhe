@@ -4,8 +4,8 @@ This code provides some utility functions for the mhe implementation.
 
 import numpy as np
 import bioptim
-from biosiglive.data_processing import add_data_to_pickle
-from biosiglive.data_plot import update_plot_force
+from biosiglive.io.save_data import add_data_to_pickle
+from biosiglive.gui.plot import LivePlot
 from time import strftime
 import datetime
 from scipy.interpolate import interp1d
@@ -48,7 +48,7 @@ def update_plot(estimator_instance, force_est: np.ndarray, q_est: np.ndarray, in
         estimator_instance.force_to_plot = np.append(
             estimator_instance.force_to_plot[:, -estimator_instance.exp_freq - 1 :], force_est, axis=1
         )
-        update_plot_force(
+        LivePlot.update_plot_force(
             estimator_instance.force_to_plot,
             estimator_instance.p_force,
             estimator_instance.app_force,
@@ -82,7 +82,13 @@ def update_plot(estimator_instance, force_est: np.ndarray, q_est: np.ndarray, in
     return np.round(absolute_delay_plot, 3)
 
 
-def compute_force(sol: bioptim.Solution, get_force, nbmt: int, use_excitation: bool = False):
+def compute_force(sol: bioptim.Solution,
+                  get_force,
+                  nbmt: int,
+                  use_excitation: bool = False,
+                  frame_to_save: int = 0,
+                  slide_size=1
+                  ):
     """
     Compute the force.
 
@@ -101,18 +107,19 @@ def compute_force(sol: bioptim.Solution, get_force, nbmt: int, use_excitation: b
     -------
     Tuple of the force, joint angles, activation and excitation.
     """
-    force_est = np.zeros((nbmt, 1))
-    q_est = sol.states["q"][:, -2:-1]
-    dq_est = sol.states["qdot"][:, -2:-1]
+    force_est = np.zeros((nbmt, slide_size))
+    q_est = sol.states["q"][:, frame_to_save:frame_to_save + slide_size]
+    dq_est = sol.states["qdot"][:, frame_to_save:frame_to_save + slide_size]
     if use_excitation:
-        a_est = sol.states["muscles"][:, -1:]
-        u_est = sol.controls["muscles"][:, -2:-1]
+        a_est = sol.states["muscles"][:, frame_to_save:frame_to_save + slide_size]
+        u_est = sol.controls["muscles"][:, frame_to_save:frame_to_save + slide_size]
     else:
-        a_est = sol.controls["muscles"][:, -2:-1]
+        a_est = sol.controls["muscles"][:, frame_to_save:frame_to_save + slide_size]
         u_est = a_est
 
     for i in range(nbmt):
-        force_est[i, 0] = get_force(q_est, dq_est, a_est, u_est)[i, :]
+        for j in range(slide_size):
+            force_est[i, j] = get_force(q_est[:, j], dq_est[:, j], a_est[:, j], u_est[:, j])[i, :]
     return force_est, q_est, dq_est, a_est, u_est
 
 
@@ -235,5 +242,4 @@ def interpolate_data(interp_factor: int, x_ref: np.ndarray, muscles_target: np.n
         muscles_target = f_mus(x_new)
     else:
         markers_ref = markers_target
-
     return x_ref, markers_ref, muscles_target

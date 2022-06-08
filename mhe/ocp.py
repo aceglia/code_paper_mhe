@@ -5,10 +5,13 @@ import bioptim
 from .utils import *
 from time import time, sleep
 import biorbd_casadi as biorbd
-from biosiglive.data_processing import read_data
+from biosiglive.io.save_data import read_data
 import numpy as np
 import datetime
+# import matplotlib.pyplot as plt
+
 import scipy.io as sio
+from scipy.interpolate import interp1d
 from casadi import MX, Function
 from bioptim import (
     MovingHorizonEstimator,
@@ -22,8 +25,9 @@ from bioptim import (
     InterpolationType,
     Solver,
     Node,
+    Bounds,
+    BiorbdInterface
 )
-
 
 def muscle_forces(
     q: np.ndarray,
@@ -107,6 +111,7 @@ def get_reference_data(file_path: str):
     -------
     Reference data.
     """
+    nfinal = 150
     if file_path[-4:] == ".mat":
         mat = sio.loadmat(file_path)
         x_ref, markers, muscles = mat["kalman"], mat["markers"], mat["emg_proc"]
@@ -116,10 +121,30 @@ def get_reference_data(file_path: str):
         try:
             x_ref, markers, muscles = mat["kalman"], mat["kin_target"], mat["muscles_target"]
         except:
-            x_ref, markers, muscles = mat["kalman"], mat["markers"], mat["emg"]
-
+            x_ref, markers, muscles = mat["kalman"][:, :nfinal], mat["markers"][:, :, :nfinal], mat["emg"][:, :nfinal]
     return x_ref, markers, muscles
 
+
+def custom_initial_states_objective(all_pn, key, target=None, slide_size=None):
+    states = all_pn.nlp.states["q"].mx
+    x_ref = np.ones((9, 10))
+    # mx_xref = MX.sym("xref", states.shape[0], 1)
+    from casadi import DM
+    x_ref_dm = DM(x_ref.shape[0], x_ref.shape[1])
+    # Function("state_dif", mx_xref, )
+    for i in range(x_ref.shape[0]):
+        # for j in range(x_ref.shape[1]):
+        x_ref_dm[i, :] = x_ref[i, :]
+    dif = x_ref - states
+    dif = BiorbdInterface.mx_to_cx("state_dif", dif, all_pn.nlp.states["q"])
+    return dif
+
+def custom_initial_controls_objective(all_pn, u_ref, slide_size):
+    controls = all_pn.nlp.controls["all"].mx
+    return u_ref.to_mx() - controls
+
+def custom_subproblem_derivative_objective():
+    pass
 
 def define_objective(
     weights: dict,
@@ -128,6 +153,7 @@ def define_objective(
     muscles_target: np.ndarray,
     kin_target: np.ndarray,
     biorbd_model: biorbd.Model,
+    previous_sol,
     kin_data_to_track: str = "markers",
     muscle_track_idx: list = (),
 ):
@@ -157,6 +183,7 @@ def define_objective(
     -------
     Objective function.
     """
+    previous_q, previous_qdot = previous_sol[:biorbd_model.nbQ(), :], previous_sol[biorbd_model.nbQ():biorbd_model.nbQ() * 2, :]
     muscle_min_idx = []
     for i in range(biorbd_model.nbMuscles()):
         if i not in muscle_track_idx:
@@ -207,6 +234,14 @@ def define_objective(
             node=Node.ALL,
             multi_thread=False,
         )
+        # objectives.add(
+        #     kin_funct,
+        #     weight=kin_weight / thorax_weight_ratio,
+        #     target=kin_target_thorax[:,:, -2][:, :, np.newaxis],
+        #     marker_index=idx_thorax,
+        #     node=Node.END,
+        #     multi_thread=False,
+        # )
         objectives.add(
             kin_funct,
             weight=kin_weight,
@@ -215,27 +250,50 @@ def define_objective(
             node=Node.ALL,
             multi_thread=False,
         )
+        # objectives.add(
+        #     kin_funct,
+        #     weight=kin_weight,
+        #     target=kin_target_bodies[:,:,-2][:, :, np.newaxis],
+        #     marker_index=idx_bodies,
+        #     node=Node.END,
+        #     multi_thread=False,
+        # )
 
     elif kin_data_to_track == "q":
-        objectives.add(kin_funct, weight=kin_weight, target=kin_target, key="q", node=Node.ALL, multi_thread=False)
+        # objectives.add(kin_funct, weight=kin_weight, target=kin_target[:, 1:-2], key="q", node=Node.INTERMEDIATES, multi_thread=False)
+        objectives.add(kin_funct, weight=kin_weight, target=kin_target[:, :], key="q", node=Node.ALL, multi_thread=False)
 
     objectives.add(
         ObjectiveFcn.Lagrange.MINIMIZE_STATE,
         weight=weights["min_q"],
-        index=np.array(range(biorbd_model.nbQ())),
+        # index=np.array(range(biorbd_model.nbQ())),
         key="q",
         node=Node.ALL,
         multi_thread=False,
+        # derivative=True,
     )
 
     objectives.add(
         ObjectiveFcn.Lagrange.MINIMIZE_STATE,
         weight=weights["min_dq"],
-        index=np.array(range(biorbd_model.nbQ())),
+        # index=np.array(range(biorbd_model.nbQ())),
         key="qdot",
         node=Node.ALL,
         multi_thread=False,
     )
+    # objectives.add(
+    #     ObjectiveFcn.Lagrange.MINIMIZE_STATE,
+    #     weight=weights["min_dq"]*10,
+    #     # index=np.array(range(biorbd_model.nbQ())),
+    #     key="qdot",
+    #     node=Node.ALL,
+    #     multi_thread=False,
+    #     derivative=True,
+    # )
+    # objectives.add(ObjectiveFcn.Lagrange.TRACK_STATE, weight=1, target=previous_q, key="q",
+    #                node=Node.ALL, multi_thread=False)
+    # objectives.add(ObjectiveFcn.Lagrange.TRACK_STATE, weight=1, target=previous_qdot, key="qdot",
+    #                node=Node.ALL, multi_thread=False)
 
     return objectives
 
@@ -295,21 +353,27 @@ def prepare_problem(
     x_bounds = BoundsList()
     x_bounds.add(bounds=QAndQDotBounds(biorbd_model))
 
-    x_bounds[0].min[:, :] = [[-200] * 3] * biorbd_model.nbQ() * 2
-    x_bounds[0].max[:, :] = [[200] * 3] * biorbd_model.nbQ() * 2
-
+    x_bounds[0].min[biorbd_model.nbQ():, :] = [[-5] * 3] * biorbd_model.nbQ()
+    x_bounds[0].max[biorbd_model.nbQ():, :] = [[5] * 3] * biorbd_model.nbQ()
+    # x_bounds[0].min[:, 0] = x0[:, 0]
+    # x_bounds[0].max[:, 0] = x0[:, 0]
     # Control path constraint
-    u_bounds = BoundsList()
-    u_bounds.add(
-        [tau_min] * nbGT + [muscle_min] * biorbd_model.nbMuscleTotal(),
-        [tau_max] * nbGT + [muscle_max] * biorbd_model.nbMuscleTotal(),
-    )
-
+    # u_bounds = BoundsList()
+    # u_bounds.add(
+    #     [tau_min] * nbGT + [muscle_min] * biorbd_model.nbMuscleTotal(),
+    #     [tau_max] * nbGT + [muscle_max] * biorbd_model.nbMuscleTotal(),
+    # interpolation=InterpolationType.CONSTANT_WITH_FIRST_AND_LAST_DIFFERENT)
+    u_bounds = Bounds([tau_min] * nbGT + [muscle_min] * biorbd_model.nbMuscleTotal(),
+        [tau_max] * nbGT + [muscle_max] * biorbd_model.nbMuscleTotal(), interpolation=InterpolationType.CONSTANT_WITH_FIRST_AND_LAST_DIFFERENT)
     # Initial guesses
-    x_init = InitialGuess(
-        np.concatenate((x0[:, : window_len + 1], np.zeros((x0.shape[0], window_len + 1)))),
-        interpolation=InterpolationType.EACH_FRAME,
-    )
+    if x0.shape[0] != biorbd_model.nbQ() * 2:
+        x_init = InitialGuess(
+            np.concatenate((x0[:, : window_len + 1], np.zeros((x0.shape[0], window_len + 1)))),
+            interpolation=InterpolationType.EACH_FRAME,
+        )
+    else:
+        x_init = InitialGuess(x0[:, : window_len + 1], interpolation=InterpolationType.EACH_FRAME)
+
     if u0 is None:
         u0 = np.array([tau_init] * nbGT + [muscle_init] * biorbd_model.nbMuscles())
         u_init = InitialGuess(np.tile(u0, (window_len, 1)).T, interpolation=InterpolationType.EACH_FRAME)
@@ -327,6 +391,7 @@ def prepare_problem(
         x_bounds=x_bounds,
         u_bounds=u_bounds,
         n_threads=nb_threads,
+        use_sx=use_acados,
     )
     if not use_acados:
         solver = Solver.IPOPT()
@@ -334,12 +399,13 @@ def prepare_problem(
         solver.set_print_level(5)
         # solver.set_hessian_approximation("limited-memory")
         solver.set_hessian_approximation("exact")
+        solver.set_maximum_iterations(50)
 
     else:
         solver = Solver.ACADOS()
         solver.set_convergence_tolerance([1e-5, 1e-5, 1e-5, 1e-5])
         solver.set_integrator_type("IRK")
-        solver.set_qp_solver("PARTIAL_CONDENSING_HPIPM")
+        solver.set_qp_solver("PARTIAL_CONDENSING_OSQP")#PARTIAL_CONDENSING_HPIPMPARTIAL_CONDENSING_OSQP
         solver.set_nlp_solver_type("SQP_RTI")
         solver.set_print_level(0)
         for key in solver_options.keys():
@@ -358,17 +424,26 @@ def configure_weights():
     weights : dict
         Dictionary of weights
     """
+    # with acados :
     weights = {
-        "track_markers": 10000000,
-        "track_q": 100000,
-        "min_control": 50000,
-        "min_dq": 100,
-        "min_q": 10,
-        "min_torque": 10000,
+        "track_markers": 10000000000,
+        "track_q": 1000000000,
+        "min_control": 10000,
+        "min_dq": 10,
+        "min_q": 1,
+        "min_torque": 1000,
         "min_act": 1,
         "track_emg": 500000,
         "min_control_tot": 10,
     }
+    # with Ipopt:
+    # weights = {
+    #     "track_markers": 10000,
+    #     "min_control": 1,
+    #     "min_dq": 0.01,
+    #     "min_q": 0.01,
+    #     "track_emg": 100,
+    # }
     return weights
 
 
@@ -384,6 +459,7 @@ def get_target(
     kin_data_to_track: str,
     model: biorbd.Model,
     offline: bool,
+    sol,
 ):
     """
     Get the target for the next MHE problem and the objective functions index.
@@ -443,10 +519,19 @@ def get_target(
     )
 
     # Angle target:
-    q_target = x_ref[:, slide_size * t : (ns_mhe + 1 + slide_size * t)] if offline else x_ref
-    q_target = (
-        np.concatenate((q_target, np.zeros((nbQ, q_target.shape[1]))), axis=0) if x_ref.shape[0] < nbQ else q_target
-    )
+    q_target = x_ref[:nbQ, slide_size * t : (ns_mhe + 1 + slide_size * t)] if offline else x_ref
+    if sol:
+        previous_sol = np.concatenate(
+            (sol.states["all"][:, slide_size:], np.repeat(sol.states["all"][:, -1][:, np.newaxis],
+                                                               slide_size, axis=1)), axis=1
+        )
+    else:
+        previous_sol = np.concatenate((x_ref[:, : ns_mhe + 1], np.zeros((x_ref.shape[0], ns_mhe + 1))))
+
+
+    # q_target = (
+    #     np.concatenate((q_target, np.zeros((nbQ, q_target.shape[1]))), axis=0) if x_ref.shape[0] < nbQ else q_target
+    # )
 
     if kin_data_to_track == "q":
         kin_target = q_target
@@ -455,7 +540,10 @@ def get_target(
         kin_target_bodies = markers_target_bodies
         kin_target = [kin_target_thorax, kin_target_bodies]
 
-    target = {"kin_target": [kin_target_idx, kin_target]}
+    target = {"kin_target": [kin_target_idx, kin_target]}#, "previous_q": [q_target_idx - 1, previous_sol[:9, :]],
+              # "previous_q_dot": [q_target_idx , previous_sol[9:18, :]]
+              # }
+    # target = {}
     if track_emg:
         target["muscle_target"] = [muscles_target_idx, muscle_target]
     return target
@@ -486,6 +574,7 @@ def update_mhe(mhe, t: int, sol: bioptim.Solution, estimator_instance, initial_t
     else : True if there are still target available, False otherwise
     """
     tic = time()
+    mhe.frame_to_export = estimator_instance.frame_to_save
     # target to save
     x_ref_to_save = []
     muscles_target_to_save = []
@@ -494,6 +583,12 @@ def update_mhe(mhe, t: int, sol: bioptim.Solution, estimator_instance, initial_t
         x_ref_to_save = mhe.x_ref
         muscles_target_to_save = mhe.muscles_ref
         kin_target_to_save = mhe.kin_target
+        # plt.figure()
+        # for i in range(kin_target_to_save.shape[0]):
+        #     plt.subplot(3, 3, i + 1)
+        #     plt.plot(x_ref_to_save[i, :])
+        #     plt.plot(kin_target_to_save[i, :])
+        # plt.show()
 
     absolute_time_frame = 0
     absolute_delay_tcp = 0
@@ -565,32 +660,24 @@ def update_mhe(mhe, t: int, sol: bioptim.Solution, estimator_instance, initial_t
         kin_data_to_track=estimator_instance.kin_data_to_track,
         model=estimator_instance.model,
         offline=estimator_instance.test_offline,
+        sol=sol
     )
     mhe.slide_size = estimator_instance.slide_size
     if estimator_instance.test_offline:
         mhe.x_ref = x_ref[
             :, estimator_instance.slide_size * t : (estimator_instance.ns_mhe + 1 + estimator_instance.slide_size * t)
         ]
-        mhe.muscles_ref = target["muscle_target"][1]
-
-        if estimator_instance.kin_data_to_track == "q":
-            mhe.kin_target = target["kin_target"][1]
-        else:
-            if isinstance(target["kin_target"][1], list):
-                mhe.kin_target = np.concatenate((target["kin_target"][1][0], target["kin_target"][1][1]), axis=1)
-            else:
-                mhe.kin_target = target["kin_target"][1]
-
     else:
         mhe.x_ref = x_ref
-        mhe.muscles_ref = target["muscle_target"][1]
-        if estimator_instance.kin_data_to_track == "q":
-            mhe.kin_target = target["kin_target"][1]
+
+    mhe.muscles_ref = target["muscle_target"][1]
+    if estimator_instance.kin_data_to_track == "q":
+        mhe.kin_target = target["kin_target"][1]
+    else:
+        if isinstance(target["kin_target"][1], list):
+            mhe.kin_target = np.concatenate((target["kin_target"][1][0], target["kin_target"][1][1]), axis=1)
         else:
-            if isinstance(target["kin_target"][1], list):
-                mhe.kin_target = np.concatenate((target["kin_target"][1][0], target["kin_target"][1][1]), axis=1)
-            else:
-                mhe.kin_target = target["kin_target"][1]
+            mhe.kin_target = target["kin_target"][1]
 
     for key in target.keys():
         if isinstance(target[key][1], list):
@@ -606,7 +693,7 @@ def update_mhe(mhe, t: int, sol: bioptim.Solution, estimator_instance, initial_t
 
     if t > 0:
         force_est, q_est, dq_est, a_est, u_est = compute_force(
-            sol, estimator_instance.get_force, estimator_instance.nbMT
+            sol, estimator_instance.get_force, estimator_instance.nbMT, frame_to_save=estimator_instance.frame_to_save
         )
 
         if estimator_instance.data_to_show:
@@ -627,26 +714,36 @@ def update_mhe(mhe, t: int, sol: bioptim.Solution, estimator_instance, initial_t
         time_tot = time_to_solve + time_to_get_data
 
         if estimator_instance.save_results:
+            if mhe.kalman is not None:
+                mhe.kalman = np.append(mhe.kalman, x_ref_to_save[:, estimator_instance.frame_to_save:estimator_instance.frame_to_save + estimator_instance.slide_size], axis=1)
+            else:
+                mhe.kalman = x_ref_to_save[:, estimator_instance.frame_to_save:estimator_instance.frame_to_save + estimator_instance.slide_size]
+
             data_to_save = {
                 "time": time() - initial_time,
                 "X_est": np.concatenate((q_est, dq_est), axis=0),
                 "U_est": u_est,
-                "kalman": x_ref_to_save[:, -2:-1],
+                "kalman": x_ref_to_save[:, estimator_instance.frame_to_save:estimator_instance.frame_to_save + estimator_instance.slide_size],
+                # "kalman": x_ref_to_save[:, 1:2],
                 "f_est": force_est,
-                "init_w_kalman": estimator_instance.init_w_kalman,
                 "none_conv_iter": stat,
                 "solver_options": estimator_instance.solver_options,
             }
             if t == 1:
                 data_to_save["Nmhe"] = estimator_instance.ns_mhe
-            data_to_save["muscles_target"] = muscles_target_to_save[:, -1:] if "muscle_target" in target.keys() else 0
+            data_to_save["muscles_target"] = muscles_target_to_save[:, estimator_instance.frame_to_save:estimator_instance.frame_to_save + estimator_instance.slide_size] if "muscle_target" in target.keys() else 0
+            # data_to_save["muscles_target"] = muscles_target_to_save[:, 0:1] if "muscle_target" in target.keys() else 0
+
             if estimator_instance.kin_data_to_track == "q":
-                kin_target = kin_target_to_save[:, -2:-1]
+                kin_target = kin_target_to_save[:, estimator_instance.frame_to_save:estimator_instance.frame_to_save + estimator_instance.slide_size]
+                # kin_target = kin_target_to_save[:, 1:2]
+
             else:
-                kin_target = kin_target_to_save[:, :, -2:-1]
+                kin_target = kin_target_to_save[:, :, estimator_instance.frame_to_save:estimator_instance.frame_to_save + estimator_instance.slide_size]
+                # kin_target = kin_target_to_save[:, :, 1:2]
 
             if estimator_instance.use_torque:
-                data_to_save["tau_est"] = sol.controls["tau"][:, -1:]
+                data_to_save["tau_est"] = sol.controls["tau"][:, estimator_instance.frame_to_save:estimator_instance.frame_to_save + estimator_instance.slide_size]
 
             data_to_save["kin_target"] = kin_target
             data_to_save["sol_freq"] = 1 / time_tot
@@ -678,8 +775,12 @@ def update_mhe(mhe, t: int, sol: bioptim.Solution, estimator_instance, initial_t
             sleep((1 / estimator_instance.exp_freq) - time_tot)
 
     if estimator_instance.test_offline:
-        if target["kin_target"][1][1].shape[2] >= estimator_instance.ns_mhe:
-            return True
+        try:
+            if target["kin_target"][1][1].shape[2] > estimator_instance.ns_mhe:
+                return True
+        except:
+            if target["kin_target"][1].shape[1] > estimator_instance.ns_mhe:
+                return True
         else:
             return False
     else:
@@ -692,33 +793,107 @@ class CustomMhe(MovingHorizonEstimator):
     """
 
     def __init__(self, **kwargs):
-        self.init_w_kalman = False
         self.x_ref = None
         self.muscles_ref = None
         self.kin_target = None
-        self.slide_size = 0
+        self.slide_size = 1
+        self.f_x, self.f_u, = None, None
+        self.kalman = None
 
         super(CustomMhe, self).__init__(**kwargs)
 
-    def advance_window(self, sol: bioptim.Solution, steps: int = 0, **advance_options):
-        """
-        Custom function that allows to move forward for more than 1 value
-        for advance the window of the MHE used in bioptim.
+    def advance_window_initial_guess_states(self, sol, **advance_options):
+        # x = sol.states["all"][:, :]
+        # t = np.arange(0, x.shape[1], 1)
+        # f_x = interp1d(t, x, kind='quadratic', fill_value="extrapolate")
+        # t_new = np.arange(self.slide_size, x.shape[1] + self.slide_size, 1)
+        # new_x = np.copy(f_x(t_new))
+        # for i in range(x.shape[0]):
+        #     fit = np.polyfit(t, x[i, :], 1)
+        #     new_x[i, :] = np.poly1d(fit)(t_new)
+        # import matplotlib.pyplot as plt
+        # plt.figure()
+        # for i in range(int(self.nlp[0].x_init.init.shape[0])):
+        #     plt.subplot(6, 3, i + 1)
+        #     plt.plot(self.nlp[0].x_init.init[i, :], label="initial guess")
+        #     plt.plot(sol.states["all"][i, :], label="solution")
+        #     if i < 9:
+        #         plt.plot(self.x_ref[i, :], label="kalman")
+        #     # plt.plot(f_x(t_new)[i, :], label="scipy")
+        #     # plt.plot(new_x[i], label="numpy")
+        # q_est = sol.states["q"][:, :]
+        # qdot_est = sol.states["qdot"][:, :]
+        # qdot_dif = np.copy(qdot_est)
+        # plt.legend()
+        #
+        # def finite_difference(data):
+        #     t = np.linspace(0, data.shape[0] / 100, data.shape[0])
+        #     dt = t[1] - t[0]
+        #     y = data
+        #     dydt = np.gradient(y, dt)
+        #     return dydt
 
-        Parameters
-        ----------
-        sol : bioptim.Solution
-            Solution of the MHE.
-        steps : int, optional
-            Number of steps to advance the window. The default is 0.
-        advance_options : dict, optional
-            Options for the advance of the window. The default is {}.
-        """
+        from biosiglive.processing.data_processing import OfflineProcessing
+        # for i in range(qdot_est.shape[0]):
+        #     qdot_dif[i, :] = finite_difference(q_est[i, :])
+            # filtering
+            # qdot_dif[i, :] = OfflineProcessing().butter_lowpass_filter(qdot_dif[i, :], 5, 100)
+        # plt.figure("q_dot")
+        # t_est = np.linspace(0, t[-1], q_est.shape[1])
+        # for i in range(9):
+        #     plt.subplot(3, 3, i + 1)
+        #     plt.plot(qdot_est[i, :], label="qdot_est")
+        #     plt.plot(qdot_dif[i, :], label="qdot_dif")
+        #     # plt.plot(t, qdot[i, :] * 180 / np.pi, label="qdotkalman")
+        #     # plt.title(model.nameDof()[i].to_string())
+        # plt.legend()
+        # plt.show()
 
-        x = sol.states["all"]
-        u = sol.controls["all"][:, :-1]
-        x0 = np.hstack((x[:, self.slide_size :], x[:, -self.slide_size :]))
-        u0 = np.hstack((u[:, self.slide_size :], u[:, -self.slide_size :]))
-        x_init = InitialGuess(x0, interpolation=InterpolationType.EACH_FRAME)
-        u_init = InitialGuess(u0, interpolation=InterpolationType.EACH_FRAME)
-        self.update_initial_guess(x_init, u_init)
+        # self.nlp[0].x_init.init[:, :] = np.concatenate((self.x_ref[:, :], x[9:, :]), axis=0)
+        # self.nlp[0].x_init.init[:, :] = np.concatenate(
+        #     (sol.states["all"][:, self.slide_size:], sol.states["all"][:, -self.slide_size:]), axis=1)
+        # self.slide_size = 1
+        self.nlp[0].x_init.init[:, :] = np.concatenate(
+            (sol.states["all"][:, self.slide_size:], np.repeat(sol.states["all"][:, -1][:, np.newaxis],
+                                                               self.slide_size, axis=1)), axis=1
+        )
+        # self.nlp[0].x_init.init[:, :] = np.concatenate(
+        #     (self.x_ref, sol.states["qdot"]), axis=0
+        # )
+        # self.nlp[0].x_init.init[:, :] = np.concatenate(
+        #     (sol.states["all"][:, self.slide_size:], sol.states["all"][:, :]
+        #     ,), axis=1)
+        # plot sol.state to see if it is correct in subplots
+
+        return True
+
+    def advance_window_initial_guess_controls(self, sol, **advance_options):
+        self.nlp[0].u_init.init[:, :] = np.concatenate(
+            (sol.controls["all"][:, self.slide_size:-1], np.repeat(sol.controls["all"][:, -2][:, np.newaxis], self.slide_size, axis=1)), axis=1
+        )
+
+        # u = sol.controls["all"][:, :-1]
+        # t = np.arange(0, u.shape[1], 1)
+        # t_new = np.arange(self.slide_size, u.shape[1] + self.slide_size)
+        # new_u = np.copy(u)
+        # for i in range(u.shape[0]):
+        #     fit = np.polyfit(t, u[i, :], 1)
+        #     new_u[i, :] = np.poly1d(fit)(t_new)
+        #
+        # # self.nlp[0].u_init.init[:, :] = f_u(t_new)
+        # self.nlp[0].u_init.init[:, :] = new_u
+
+        # self.nlp[0].u_init.init[:, :] = np.concatenate(
+        #     (sol.controls["all"][:, 1:-1], sol.controls["all"][:, -2:-1]
+        #     ,), axis=1)
+        return True
+
+    def advance_window_bounds_states(self, sol, **advance_options):
+        # self.slide_size = 1
+        self.nlp[0].u_bounds[:, 0] = sol.controls["all"][:, self.slide_size]
+        self.nlp[0].x_bounds.min[:, 0] = sol.states["all"][:, self.slide_size]
+        self.nlp[0].x_bounds.max[:, 0] = sol.states["all"][:, self.slide_size]
+        return True
+
+    def export_data(self, sol) -> tuple:
+        return sol.states["all"][:, self.frame_to_export:self.frame_to_export+self.slide_size], sol.controls["all"][:, self.frame_to_export:self.frame_to_export+self.slide_size]
