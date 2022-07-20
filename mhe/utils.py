@@ -4,12 +4,15 @@ This code provides some utility functions for the mhe implementation.
 
 import numpy as np
 import bioptim
-from biosiglive.io.save_data import add_data_to_pickle
+from biosiglive.io.save_data import add_data_to_pickle, read_data
+from biosiglive.interfaces.client_interface import TcpClient
+from biosiglive.streaming.client import Client
 from biosiglive.gui.plot import LivePlot
 from time import strftime
 import datetime
 from scipy.interpolate import interp1d
 import os
+import scipy.io as sio
 
 
 def check_and_adjust_dim(*args):
@@ -46,20 +49,31 @@ def update_plot(estimator_instance, force_est: np.ndarray, q_est: np.ndarray, in
     absolute_delay_plot = 0
     if estimator_instance.data_to_show.count("force") != 0:
         estimator_instance.force_to_plot = np.append(
-            estimator_instance.force_to_plot[:, -estimator_instance.exp_freq - 1 :], force_est, axis=1
+            estimator_instance.force_to_plot[:, -estimator_instance.exp_freq - 1:], force_est, axis=1
         )
-        LivePlot.update_plot_force(
-            estimator_instance.force_to_plot,
-            estimator_instance.p_force,
-            estimator_instance.app_force,
-            estimator_instance.plot_force_ratio,
-            muscle_names=estimator_instance.muscle_names,
+        # LivePlot.update_plot_force(
+        #     estimator_instance.force_to_plot,
+        #     estimator_instance.p_force,
+        #     estimator_instance.app_force,
+        #     estimator_instance.plot_force_ratio,
+        #     muscle_names=estimator_instance.muscle_names,
+        # )
+        estimator_instance.all_plot.update_plot_window(
+            estimator_instance.all_plot.plot[0],
+            data=estimator_instance.force_to_plot,
+            app=estimator_instance.app_force,
+            rplt=estimator_instance.rplt_force,
+            box=estimator_instance.layout_force
         )
+
         estimator_instance.count_p_f = 0
         estimator_instance.count_p_f += 1
 
     if estimator_instance.data_to_show.count("q") != 0:
-        estimator_instance.b.set_q(np.array(q_est)[:, -1])
+        # estimator_instance.b.set_q(np.array(q_est)[:, -1])
+        n_plot = 0 if not "force" in estimator_instance.data_to_show else 1
+        estimator_instance.all_plot.update_plot_window(estimator_instance.all_plot.plot[n_plot],
+                                                       np.array(q_est)[:, -1])
 
     if init_time:
         absolute_time_received = datetime.datetime.now()
@@ -107,6 +121,9 @@ def compute_force(sol: bioptim.Solution,
     -------
     Tuple of the force, joint angles, activation and excitation.
     """
+    if frame_to_save >= sol.states["q"].shape[1] - 1 + slide_size:
+        raise RuntimeError(f"You can ask to save frame from 0 to {sol.states['q'].shape[1] + slide_size}."
+                           f"You asked{frame_to_save}.")
     force_est = np.zeros((nbmt, slide_size))
     q_est = sol.states["q"][:, frame_to_save:frame_to_save + slide_size]
     dq_est = sol.states["qdot"][:, frame_to_save:frame_to_save + slide_size]
@@ -125,7 +142,7 @@ def compute_force(sol: bioptim.Solution,
 
 def save_results(
     data: dict,
-    current_time: float,
+    current_time: str,
     kin_data_to_track: str = "markers",
     track_emg: bool = False,
     use_torque: bool = True,
@@ -140,7 +157,7 @@ def save_results(
     ----------
     data: dict
         The data to save.
-    current_time: float
+    current_time: str
         The current time.
     kin_data_to_track: str
         The data to track.
@@ -243,3 +260,27 @@ def interpolate_data(interp_factor: int, x_ref: np.ndarray, muscles_target: np.n
     else:
         markers_ref = markers_target
     return x_ref, markers_ref, muscles_target
+
+
+def get_data(ip=None,
+             port=None,
+             message=None,
+             offline=False,
+             offline_file_path=None):
+    if offline:
+        nfinal = -1
+        if offline_file_path[-4:] == ".mat":
+            mat = sio.loadmat(offline_file_path)
+            x_ref, markers, muscles = mat["kalman"], mat["markers"], mat["emg_proc"]
+
+        else:
+            mat = read_data(offline_file_path)
+            try:
+                x_ref, markers, muscles = mat["kalman"], mat["kin_target"], mat["muscles_target"]
+            except:
+                x_ref, markers, muscles = mat["kalman"][:, :nfinal], mat["markers"][:, 4:, :nfinal], mat["emg"][:,
+                                                                                                     :nfinal]
+        return x_ref, markers, muscles
+    else:
+        client = Client(ip, port, "TCP")
+        return client.get_data(message)
