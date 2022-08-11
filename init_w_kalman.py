@@ -15,12 +15,8 @@ except ModuleNotFoundError:
     pass
 import C3DtoTRC
 import csv
-from biosiglive.streaming.client import Client
-from biosiglive.streaming.connection import Server
 from biosiglive.processing.msk_functions import kalman_func
 from biosiglive.io.save_data import read_data, add_data_to_pickle
-import numpy as np
-from time import sleep
 
 
 def read_sto_mot_file(filename):
@@ -79,7 +75,7 @@ def initialize(model_path: str, data_dir: str, scaling: bool = False, off_line: 
         Mass of the subject. The default is None.
     """
     mat = read_data(f"{data_dir}/{trial}")
-    markers = mat["markers"][:3, :, :]
+    markers = mat["markers"][:3, :, :20]
 
     # Define the name of the model's markers
     marker_names = [
@@ -96,9 +92,9 @@ def initialize(model_path: str, data_dir: str, scaling: bool = False, off_line: 
         "EPICm",
         "DELT",
         "ARMl",
+        "LARM_elb",
         "STYLr",
         "STYLu",
-        "LARM_elb",
     ]
 
     # markers_tmp = np.copy(markers)
@@ -109,14 +105,13 @@ def initialize(model_path: str, data_dir: str, scaling: bool = False, off_line: 
     if scaling:
         # ---------- model scaling ------------ #
         from pathlib import Path
-
         osim_model_path = model_path
         model_output = f"{data_dir}/" + Path(osim_model_path).stem + f"_scaled.osim"
         scaling_tool = f"{data_dir}/scaling_tool.xml"
-        trc_file = f"{data_dir}/anato.trc"
+        trc_file = f"{data_dir}/{trial}.trc"
         C3DtoTRC.WriteTrcFromMarkersData(
             trc_file,
-            markers=markers[:3, :, :20],
+            markers=markers[:3, :, :-1],
             marker_names=marker_names,
             data_rate=100,
             cam_rate=100,
@@ -137,20 +132,19 @@ def initialize(model_path: str, data_dir: str, scaling: bool = False, off_line: 
             xml_input=scaling_tool,
             xml_output=f"{data_dir}/scaling_tool_output.xml",
             static_path=trc_file,
-            coordinate_file_name=f"{data_dir}/ik/anato.mot",
+            coordinate_file_name=f"{data_dir}/ik/{trial}.mot",
             mass=mass,
         )
 
         convert_model(
-            in_path=f"{data_dir}/" + Path(model_output).stem + ".osim",
+            in_path=f"{data_dir}/" + Path(model_output).stem + "_markers.osim",
             out_path=f"{data_dir}/" + Path(model_output).stem + ".bioMod",
             viz=False,
         )
 
     else:
         bmodel = biorbd.Model(model_path)
-
-        q_recons, _ = kalman_func(markers, model=bmodel, return_kalman=False)
+        q_recons, _ = kalman_func(markers, model=bmodel, use_kalman=True)
         q_mean = q_recons.mean(axis=1)
         print(q_mean[3], q_mean[4], q_mean[5]," xyz " , q_mean[0], q_mean[1], q_mean[2])
         b = bioviz.Viz(model_path=model_path)
@@ -184,19 +178,79 @@ def convert_model(in_path: str, out_path: str, viz: bool = None):
 
 
 if __name__ == "__main__":
-    trial = "anato"
+    trial = [
+        # "data_abd_poid_2kg",
+        # "data_flex_sans_poid",
+        #      "data_abd_sans_poid",
+        #      "data_cycl_poid_2kg",
+             "data_cycl_sans_poid",
+        # "data_flex_poid_2k",
+
+    ]
+    # trial = trial[0]
+    model_path = "data_final_new/subject_3/wu_scaled.bioMod"
+    model = biorbd.Model(model_path)
+    for i in trial:
+        results_mat_abd = read_data(f"data_final_new/subject_3/{i}")
+        # results_mat_flex = read_data(f"data_final_new/subject_3/{trial}")
+        # convert_model(f"data_final_new/subject_3/wu_scaled.osim", f"data_final_new/subject_3/wu_scaled.bioMod", viz=True)
+        # model_path = f"{data_dir}/wu.osim"
+        # # model = biorbd.Model(model_path)
+
+        q_recons, q_dot = kalman_func(results_mat_abd["markers"][:, :, 1000:], return_q_dot=True, model=model, use_kalman=True)
+        import numpy as np
+
+        # def finite_difference(data, f):
+        #     t = np.linspace(0, data.shape[0] / f, data.shape[0])
+        #     y = data
+        #     dydt = np.gradient(y, t)
+        #     return dydt
+        import matplotlib.pyplot as plt
+        for s in range(len(trial)):
+            plt.figure("markers")
+            for i in range(model.nbMarkers()):
+                plt.subplot(4, 4, i + 1)
+                plt.plot(results_mat_abd["markers"][0, i, 1000:].T, "-r")
+                plt.plot(results_mat_abd["markers"][1, i, 1000:].T, "-r")
+                plt.plot(results_mat_abd["markers"][2, i, 1000:].T, "-r")
+        plt.show()
+        b = bioviz.Viz(model_path=model_path)
+        b.load_movement(q_recons)
+        b.load_experimental_markers(results_mat_abd["markers"][:, :, 1000:])
+        b.exec()
+        # q_dot = np.copy(q_recons)
+        # for j in range(q_recons.shape[0]):
+        #     q_dot[j, :] = finite_difference(q_recons[j, :], 100)
+        results_mat_abd["emg_proc"] = results_mat_abd["emg_proc"][:, 1000:]
+        results_mat_abd["markers"] = results_mat_abd["markers"][:, :, 1000:]
+        results_mat_abd["kalman"] = np.concatenate((q_recons, q_dot), axis=0)
+        add_data_to_pickle(results_mat_abd, f"{i}_test")
+
+
+    # import matplotlib.pyplot as plt
+    # for s in range(len(trial)):
+    #     plt.figure("markers")
+    #     for i in range(model.nbMarkers()):
+    #         plt.subplot(4, 4, i + 1)
+    #         plt.plot(results_mat_abd["markers"][0, i, :].T, "-r")
+    #         plt.plot(results_mat_abd["markers"][1, i, :].T, ".-r")
+    #         plt.plot(results_mat_abd["markers"][2, i, :].T, "--r")
+    #         plt.plot(results_mat_flex["markers"][0, i, :].T, "-b")
+    #         plt.plot(results_mat_flex["markers"][1, i, :].T, ".-b")
+    #         plt.plot(results_mat_flex["markers"][2, i, :].T, "--b")
+    # plt.show()
     subject = "subject_3"
-    mass = 62
+    mass = 72
     mass_scaling = mass * 0.578 + mass * 0.050
     data_dir = f"data_final_new/{subject}"
     model_path = f"{data_dir}/wu_scaled.bioMod"
+    # convert_model(f"{data_dir}/wu_scaled_markers.osim", f"{data_dir}/wu_scaled_markers.bioMod", viz=True)
     # model_path = f"{data_dir}/wu.osim"
-    model = biorbd.Model(model_path)
-    for i, muscle in enumerate(model.muscleNames()):
-        print(f"idx: {i} - name: {muscle.to_string()}")
+    trial = trial[0]
+    # model = biorbd.Model(model_path)
+    # for i, muscle in enumerate(model.muscleNames()):
+    #     print(f"idx: {i} - name: {muscle.to_string()}")
     initialize(model_path, data_dir, scaling=False, off_line=True, mass=mass_scaling)
-
-
 
     # Write file
     # data_path = f"{data_dir}/{trial}"

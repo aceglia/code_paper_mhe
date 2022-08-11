@@ -4,6 +4,8 @@ This script is the main script for the project. It is used to run the mhe solver
 import os.path
 import shutil
 
+import numpy as np
+
 from biosiglive.streaming.client import Client, Message
 import multiprocessing as mp
 from mhe.ocp import *
@@ -70,7 +72,7 @@ class MuscleForceEstimator:
         self.plot_q_freq, self.plot_force_freq = self.exp_freq, 10
         self.force_to_plot, self.q_to_plot = [], []
         self.count_p_f, self.count_p_q = [], []
-        self.mvc_list = []
+        self.mvc_list = None
         self.interpol_factor = 1
         self.weights = {}
         self.result_dir = None
@@ -88,6 +90,7 @@ class MuscleForceEstimator:
         # Use the configuration dictionary to initialize the muscle force estimator parameters
         for key in conf.keys():
             self.__dict__[key] = conf[key]
+
         from math import ceil
         self.T_mhe = self.mhe_time
         self.ns_mhe = int(self.T_mhe * self.markers_rate * self.interpol_factor)
@@ -129,23 +132,23 @@ class MuscleForceEstimator:
             self.message = Message(command=self.data_to_get,
                                    read_frequency=self.exp_freq,
                                    nb_frame_to_get=nb_of_data,
-                                   get_raw_data=True,
+                                   get_raw_data=False,
                                    kalman=True,
-                                   ratio=1
+                                   ratio=1,
                                    )
             data = get_data(ip=self.server_ip, port=self.server_port, message=self.message)
             x_ref = np.array(data["kalman"])
-            markers_target = np.array(data["markers"])
+            markers_target = np.array(data["markers"])[:, 4:, :]
             muscles_target = np.array(data["emg_proc"])
 
+        # x_ref = read_data(f"data_final_new/subject_3/data_abd_poid_2kg_test")["kalman"]
         window_len = self.ns_mhe
         window_duration = self.T_mhe
         self.x_ref, self.markers_target, muscles_target = interpolate_data(
             self.interpol_factor, x_ref, muscles_target, markers_target
         )
-
         self.muscles_target = muscle_mapping(
-            muscles_target_tmp=muscles_target, mvc_list=mvc_list, muscle_track_idx=self.muscle_track_idx
+            muscles_target_tmp=muscles_target, muscle_track_idx=self.muscle_track_idx, mvc_list=self.mvc_list
         )[:, :window_len]
         self.kin_target = (
             self.markers_target[:, :, : window_len + 1]
@@ -155,11 +158,16 @@ class MuscleForceEstimator:
 
         for i in range(biorbd_model.nbMuscles()):
             self.muscle_names.append(biorbd_model.muscleNames()[i].to_string())
-        if self.x_ref.shape[0] != biorbd_model.nbQ()*2:
+        if self.x_ref.shape[0] != biorbd_model.nbQ() * 2:
             previous_sol = np.concatenate((self.x_ref[:, : window_len + 1], np.zeros((self.x_ref.shape[0], window_len + 1))))
         else:
             previous_sol = self.x_ref[:, : window_len + 1]
-
+        muscle_init = np.ones((biorbd_model.nbMuscles(), self.ns_mhe)) * 0.1
+        count = 0
+        for i in self.muscle_track_idx:
+            muscle_init[i, :] = self.muscles_target[count, :self.ns_mhe]
+            count += 1
+        u0 = np.concatenate((muscle_init, np.zeros((biorbd_model.nbQ(), self.ns_mhe))))
         objectives = define_objective(
             weights=self.weights,
             use_torque=self.use_torque,
@@ -287,8 +295,8 @@ class MuscleForceEstimator:
         data_to_show : list
             List of data to show.
         """
-        if os.path.isdir("c_generated_code"):
-            shutil.rmtree("c_generated_code")
+        # if os.path.isdir("c_generated_code"):
+        #     shutil.rmtree("c_generated_code")
         self.prepare_problem_init()
         if data_to_show:
             self.plot_event.wait()
@@ -366,7 +374,7 @@ class MuscleForceEstimator:
         plt.legend()
         plt.figure("q")
         for i in range(self.model.nbQ()):
-            plt.subplot(4,3, i + 1)
+            plt.subplot(4, 3, i + 1)
             plt.plot(q_est[i, :] * 180 / np.pi, label="q_est")
             plt.plot(sol_rk45.states["q"][i, :] * 180 / np.pi, label="q_int_rk")
             # plt.plot(sol_lsoda.states["q"][i, :] * 180 / np.pi, label="q_lsoda")
@@ -385,63 +393,81 @@ class MuscleForceEstimator:
         plt.figure("rmse integrate")
         t = np.linspace(0, q_est.shape[1] / 33, q_est.shape[1])
         for i in range(q_est.shape[0]):
-            plt.subplot(3, 3, i + 1)
+            plt.subplot(4, 3, i + 1)
             plt.plot(t, np.ones((rmse_q.shape[0], rmse_q.shape[1]))[i, :])
             plt.plot(t, rmse_q[i, :])
-        sol.graphs()
-        plt.show()
+        # sol.graphs()
+        # plt.show()
 
 
 if __name__ == "__main__":
-    subject = f"subject_2"
+    subject = f"subject_3"
     data_dir = f"data_final_new/{subject}/"
+    # data_dir = f"data_final/"
 
-    mvc = sio.loadmat(data_dir + f"MVC_{subject}.mat")["MVC_list_max"][0]
-    mvc_list = [
-        mvc[0],
-        mvc[0],
-        mvc[0],  # MVC Pectoralis sternalis
-        mvc[1],  # MVC Deltoid anterior
-        mvc[2],  # MVC Deltoid medial
-        mvc[3],  # MVC Deltoid posterior
-        mvc[4],
-        mvc[4],  # MVC Biceps brachii
-        mvc[5],
-        mvc[5],
-        mvc[5],  # MVC Triceps brachii
-        mvc[6],  # MVC Trapezius superior
-        mvc[6],  # MVC Trapezius superior
-        mvc[7],  # MVC Trapezius medial
-        mvc[8],  # MVC Trapezius inferior
-        mvc[9],  # MVC Latissimus dorsi
-    ]
+    # mvc = sio.loadmat(data_dir + f"MVC_{subject}.mat")["MVC_list_max"][0]
+    # mvc_list = [
+    #     mvc[0],
+    #     mvc[0],
+    #     mvc[0],  # MVC Pectoralis sternalis
+    #     mvc[1],  # MVC Deltoid anterior
+    #     mvc[2],  # MVC Deltoid medial
+    #     mvc[3],  # MVC Deltoid posterior
+    #     mvc[4],
+    #     mvc[4],  # MVC Biceps brachii
+    #     mvc[5],
+    #     mvc[5],
+    #     mvc[5],  # MVC Triceps brachii
+    #     mvc[6],  # MVC Trapezius superior
+    #     mvc[6],  # MVC Trapezius superior
+    #     mvc[7],  # MVC Trapezius medial
+    #     mvc[8],  # MVC Trapezius inferior
+    #     mvc[9],  # MVC Latissimus dorsi
+    # ]
 
+    # result_dir = data_dir
     result_dir = data_dir
-    trials = ["flex_w_dq_scaled"]#, "flex_w_dq", "cycl_w_dq", "abd_cocon_w_dq", "flex_cocon_w_dq", "cycl_cocon_w_dq"]
-    configs = ["mhe"]  # , "mhe"]
+    trials = [
+        "data_abd_poid_2kg_test", "data_flex_poid_2k_test",
+        "data_abd_sans_poid_test", "data_flex_sans_poid_test"
+    ]
+    # trials = ["abd_w_dq"]
+    #, "flex_w_dq", "cycl_w_dq", "abd_cocon_w_dq", "flex_cocon_w_dq", "cycl_cocon_w_dq"]
+    configs = [0.05, 0.08, 0.1, 1.2, 1.5]  # , "mhe"]
+    # configs = [0.1]
 
     for config in configs:
         for trial in trials:
-            offline_path = result_dir + f"{trial}"
-            file_name = f"{trial}_result"
+            offline_path = data_dir + f"{trial}"
+            file_name = f"{trial}_result_duration_{config}"
 
-            solver_options = {"sim_method_jac_reuse": 1,  "levenberg_marquardt": 50.0, "nlp_solver_step_length": 0.80
-                              # , "sim_method_newton_iter": 1,
-                              }
+            solver_options = {
+                              "sim_method_jac_reuse": 1,
+                              "levenberg_marquardt": 50.0,
+                              "nlp_solver_step_length": 0.9,
+                              "qp_solver_iter_max": 500,
+                              # "qp_tol": 1e1,
+                              # "sim_method_newton_iter": 4,
+                              # "qp_solver_cond_N": 5,
+                              # "qp_solver_warm_start": 0
+            }
             # solver_options = {}
-
+            if "k" in trial:
+                model = data_dir + f"wu_scaled_cylinder.bioMod"
+            else:
+                model = data_dir + f"wu_scaled.bioMod"
             configuration_dic = {
                 # "model_path": data_dir + f"model_{subject}_scaled.bioMod",
-                "model_path": data_dir + f"wu_scaled.bioMod",
+                "model_path": model,
                 # "model_path": data_dir + f"Wu_Shoulder_Model_mod_wt_wrapp_Clara_scaled.bioMod",
-                "mhe_time": 0.1,
+                "mhe_time": config,
                 "interpol_factor": 2,
                 "use_torque": True,
                 "use_excitation": False,
                 "save_results": True,
                 "track_emg": True,
                 "kin_data_to_track": "markers",
-                "mvc_list": mvc_list,
+                # "mvc_list": mvc_list,
                 "exp_freq": 33,
                 "muscle_track_idx": [
                     14,
@@ -465,14 +491,14 @@ if __name__ == "__main__":
                 "result_file_name": file_name,
                 "solver_options": solver_options,
                 "weights": configure_weights(),
-                "frame_to_save": 1,
+                "frame_to_save": 0,
             }
 
             variables_dic = {"print_lvl": 1}  # print level 0 = no print, 1 = print information
 
-            data_to_show = ["q",]#"force", "q"]
-            # data_to_show = None
-            server_ip = "127.0.0.1"
+            # data_to_show = ["q",]#"force", "q"]
+            data_to_show = None
+            server_ip = "192.168.1.211"
             server_port = 50000
             MHE = MuscleForceEstimator(configuration_dic)
             MHE.run(variables_dic, server_ip, server_port, data_to_show, test_offline=True, offline_file=offline_path)

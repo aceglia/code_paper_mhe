@@ -227,7 +227,7 @@ def define_objective(
         multi_thread=False,
         # derivative=True
     )
-    objectives.add(ObjectiveFcn.Lagrange.TRACK_STATE, weight=1000000000, target=previous_q[:, :], key="q",
+    objectives.add(ObjectiveFcn.Lagrange.TRACK_STATE, weight=100000000, target=previous_q[:, :], key="q",
                    node=Node.ALL, multi_thread=False)
     objectives.add(ObjectiveFcn.Lagrange.TRACK_STATE, weight=100000, target=previous_qdot[:, :], key="qdot",
                    node=Node.ALL, multi_thread=False)
@@ -275,7 +275,7 @@ def custom_muscles_driven(
     muscles_tau = DynamicsFunctions.compute_tau_from_muscle(nlp, q, qdot, mus_activations)
 
     for i in range(nlp.model.nbQ()):
-        if i > 4:
+        if i > 4 and i != nlp.model.nbQ() - 1:
             residual_tau[i] = MX(0)
 
     tau = muscles_tau + residual_tau if residual_tau is not None else muscles_tau
@@ -354,12 +354,12 @@ def prepare_problem(
     if use_excitation:
         x_bounds[0].concatenate(Bounds([0] * biorbd_model.nbMuscles(), [1] * biorbd_model.nbMuscles()))
 
-    x_bounds[0].min[:biorbd_model.nbQ(), 0] = x_0[:biorbd_model.nbQ(), 0]
-    x_bounds[0].max[:biorbd_model.nbQ(), 0] = x_0[:biorbd_model.nbQ(), 0]
-    x_bounds[0].min[biorbd_model.nbQ():biorbd_model.nbQ() * 2, 0] = x_0[biorbd_model.nbQ():, 0]
-    x_bounds[0].max[biorbd_model.nbQ():biorbd_model.nbQ() * 2, 0] = x_0[biorbd_model.nbQ():, 0]
-    x_bounds[0].min[biorbd_model.nbQ():biorbd_model.nbQ() * 2, [1, -1]] = [[-4] * 2] * biorbd_model.nbQ()
-    x_bounds[0].max[biorbd_model.nbQ():biorbd_model.nbQ() * 2, [1, -1]] = [[4] * 2] * biorbd_model.nbQ()
+    x_bounds[0].min[:biorbd_model.nbQ(), 0] = [i - 0.1 * i for i in x_0[:biorbd_model.nbQ(), 0]]
+    x_bounds[0].max[:biorbd_model.nbQ(), 0] = [i + 0.1 * i for i in x_0[:biorbd_model.nbQ(), 0]]
+    x_bounds[0].min[biorbd_model.nbQ():biorbd_model.nbQ() * 2, 0] = [i - 0.1 * i for i in x_0[biorbd_model.nbQ():, 0]]
+    x_bounds[0].max[biorbd_model.nbQ():biorbd_model.nbQ() * 2, 0] = [i + 0.1 * i for i in x_0[biorbd_model.nbQ():, 0]]
+    x_bounds[0].min[biorbd_model.nbQ():biorbd_model.nbQ() * 2, [1, -1]] = [[-5] * 2] * biorbd_model.nbQ()
+    x_bounds[0].max[biorbd_model.nbQ():biorbd_model.nbQ() * 2, [1, -1]] = [[5] * 2] * biorbd_model.nbQ()
 
     u_bounds = Bounds([tau_min] * nbGT + [muscle_min] * biorbd_model.nbMuscleTotal(),
         [tau_max] * nbGT + [muscle_max] * biorbd_model.nbMuscleTotal(),
@@ -405,12 +405,11 @@ def prepare_problem(
         solver = Solver.ACADOS()
         # solver.set_convergence_tolerance([1e-5, 1e-5, 1e-5, 1e-5])
         solver.set_integrator_type("IRK")
-        solver.set_qp_solver("PARTIAL_CONDENSING_OSQP")#PARTIAL_CONDENSING_HPIPMPARTIAL_CONDENSING_OSQP
+        solver.set_qp_solver("PARTIAL_CONDENSING_OSQP")#PARTIAL_CONDENSING_HPIPMPARTIAL_CONDENSING_OSQPFULL_CONDENSING_QPOASES
         solver.set_nlp_solver_type("SQP_RTI")
-
         solver.set_print_level(0)
         for key in solver_options.keys():
-            solver.set_option(val=solver_options[key], name=key)
+            solver.set_option_unsafe(val=solver_options[key], name=key)
         # solver.set_sim_method_num_steps(1)
         # solver.set_sim_method_num_stages(2)
 
@@ -426,17 +425,60 @@ def configure_weights():
     weights : dict
         Dictionary of weights
     """
-    # with acados :
+    # # with HPIPM:
+    # weights = {
+    #     "track_markers": 1000000000,
+    #     "track_q": 100000000000000,
+    #     "min_control": 100,
+    #     "min_dq": 1,
+    #     "min_q": 1,
+    #     "min_torque": 10000,
+    #     "track_emg": 1000000,
+    #     "min_activation": 10,
+    # }
+    # OSQP
+    # weights = {
+    #     "track_markers": 1000000000000,
+    #     "track_q": 100000000000000,
+    #     "min_control": 10000000,
+    #     "min_dq": 1000000,
+    #     "min_q": 100,
+    #     "min_torque": 1000000,
+    #     "track_emg": 100000000,
+    #     "min_activation": 10,
+    # }
+    # avec poids
     weights = {
-        "track_markers": 1000000000000000000,
+        "track_markers": 10000000000000,
         "track_q": 100000000000000,
-        "min_control": 100000000,
-        "min_dq": 10,
+        "min_control": 10000000,
+        "min_dq": 1000,
         "min_q": 1,
-        "min_torque": 100000,
-        "track_emg": 100000000000000,
+        "min_torque": 1000,
+        "track_emg": 100000000000,
         "min_activation": 10,
+
     }
+    # weights = {
+    #     "track_markers": 10000,
+    #     # "track_q": 100,
+    #     "min_control": 10,
+    #     "min_dq": 0.0001,
+    #     "min_q": 0.000001,
+    #     "min_torque": 100,
+    #     "track_emg": 1000,
+    #     # "min_activation": 10,
+    # }
+    # weights = {
+    #     "track_markers": 1000000000000000000,
+    #     "track_q": 100000000000000,
+    #     "min_control": 1000000,
+    #     "min_dq": 10,
+    #     "min_q": 1,
+    #     "min_torque": 1000000,
+    #     "track_emg": 10000000000000,
+    #     "min_activation": 10,
+    # }
     # with Ipopt:
     # weights = {
     #     "track_markers": 10000,
@@ -674,7 +716,7 @@ def update_mhe(mhe, t: int, sol: bioptim.Solution, estimator_instance, initial_t
     if t > 0:
         tmp_slide_size = estimator_instance.slide_size
         estimator_instance.slide_size = 1
-        force_est, q_est, dq_est, a_est, u_est = compute_force(
+        q_est, dq_est, a_est, u_est = compute_force(
             sol,
             estimator_instance.get_force,
             estimator_instance.nbMT,
@@ -684,7 +726,7 @@ def update_mhe(mhe, t: int, sol: bioptim.Solution, estimator_instance, initial_t
         if estimator_instance.data_to_show:
             dic_to_put = {
                 "t": t,
-                "force_est": force_est.tolist(),
+                # "force_est": force_est.tolist(),
                 "q_est": q_est.tolist(),
                 "init_time_frame": absolute_time_received_s,
             }
@@ -699,31 +741,66 @@ def update_mhe(mhe, t: int, sol: bioptim.Solution, estimator_instance, initial_t
         time_tot = time_to_solve + time_to_get_data
 
         if estimator_instance.save_results:
+            # if mhe.kalman is not None:
+            #     mhe.kalman = np.append(mhe.kalman, x_ref_to_save[:, estimator_instance.frame_to_save:estimator_instance.frame_to_save + estimator_instance.slide_size], axis=1)
+            # else:
+            #     mhe.kalman = x_ref_to_save[:, estimator_instance.frame_to_save:estimator_instance.frame_to_save + estimator_instance.slide_size]
+            #
+            # data_to_save = {
+            #     "time": time() - initial_time,
+            #     "X_est": np.concatenate((q_est, dq_est), axis=0),
+            #     "U_est": u_est,
+            #     "kalman": x_ref_to_save[:, estimator_instance.frame_to_save:estimator_instance.frame_to_save + estimator_instance.slide_size],
+            #     # "f_est": force_est,
+            #     "none_conv_iter": stat,
+            #     "solver_options": estimator_instance.solver_options,
+            # }
+            # if t == 1:
+            #     data_to_save["Nmhe"] = estimator_instance.ns_mhe
+            # data_to_save["muscles_target"] = muscles_target_to_save[:, estimator_instance.frame_to_save:estimator_instance.frame_to_save + estimator_instance.slide_size] if "muscle_target" in target.keys() else 0
+            # if estimator_instance.kin_data_to_track == "q":
+            #     kin_target = kin_target_to_save[:, estimator_instance.frame_to_save:estimator_instance.frame_to_save + estimator_instance.slide_size]
+            #
+            # else:
+            #     kin_target = kin_target_to_save[:, :, estimator_instance.frame_to_save:estimator_instance.frame_to_save + estimator_instance.slide_size]
+            #
+            # if estimator_instance.use_torque:
+            #     data_to_save["tau_est"] = sol.controls["tau"][:, estimator_instance.frame_to_save:estimator_instance.frame_to_save + estimator_instance.slide_size]
+            #
+            # data_to_save["kin_target"] = kin_target
+            # data_to_save["sol_freq"] = 1 / time_tot
+            # data_to_save["exp_freq"] = estimator_instance.exp_freq
+            # data_to_save["sleep_time"] = (1 / estimator_instance.exp_freq) - time_tot
+            # data_to_save["absolute_delay_tcp"] = absolute_delay_tcp
+            # data_to_save["absolute_time_receive"] = absolute_time_received_dic
+            # data_to_save["absolute_time_frame"] = absolute_time_frame
+            # if vicon_latency:
+            #     data_to_save["vicon_latency"] = vicon_latency
             if mhe.kalman is not None:
-                mhe.kalman = np.append(mhe.kalman, x_ref_to_save[:, estimator_instance.frame_to_save:estimator_instance.frame_to_save + estimator_instance.slide_size], axis=1)
+                mhe.kalman = np.append(mhe.kalman, x_ref_to_save, axis=1)
             else:
-                mhe.kalman = x_ref_to_save[:, estimator_instance.frame_to_save:estimator_instance.frame_to_save + estimator_instance.slide_size]
+                mhe.kalman = x_ref_to_save
 
             data_to_save = {
                 "time": time() - initial_time,
                 "X_est": np.concatenate((q_est, dq_est), axis=0),
                 "U_est": u_est,
-                "kalman": x_ref_to_save[:, estimator_instance.frame_to_save:estimator_instance.frame_to_save + estimator_instance.slide_size],
-                "f_est": force_est,
+                "kalman": x_ref_to_save,
+                # "f_est": force_est,
                 "none_conv_iter": stat,
                 "solver_options": estimator_instance.solver_options,
             }
             if t == 1:
                 data_to_save["Nmhe"] = estimator_instance.ns_mhe
-            data_to_save["muscles_target"] = muscles_target_to_save[:, estimator_instance.frame_to_save:estimator_instance.frame_to_save + estimator_instance.slide_size] if "muscle_target" in target.keys() else 0
+            data_to_save["muscles_target"] = muscles_target_to_save if "muscle_target" in target.keys() else 0
             if estimator_instance.kin_data_to_track == "q":
-                kin_target = kin_target_to_save[:, estimator_instance.frame_to_save:estimator_instance.frame_to_save + estimator_instance.slide_size]
+                kin_target = kin_target_to_save
 
             else:
-                kin_target = kin_target_to_save[:, :, estimator_instance.frame_to_save:estimator_instance.frame_to_save + estimator_instance.slide_size]
+                kin_target = kin_target_to_save
 
             if estimator_instance.use_torque:
-                data_to_save["tau_est"] = sol.controls["tau"][:, estimator_instance.frame_to_save:estimator_instance.frame_to_save + estimator_instance.slide_size]
+                data_to_save["tau_est"] = sol.controls["tau"]
 
             data_to_save["kin_target"] = kin_target
             data_to_save["sol_freq"] = 1 / time_tot

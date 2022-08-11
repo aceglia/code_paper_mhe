@@ -27,6 +27,7 @@ from biosiglive.interfaces import pytrigno_interface, vicon_interface
 from biosiglive.processing.data_processing import RealTimeProcessing
 from biosiglive.processing.msk_functions import kalman_func
 from biosiglive.gui.plot import LivePlot
+from biosiglive.io.save_data import read_data
 
 vicon_package, biorbd_package = True, True
 
@@ -50,7 +51,7 @@ class LiveData:
             server_ports=(),
             type=None,
             acquisition_rate=100,
-            read_frequency=None,
+            stream_rate=None,
             timeout=None,
             buff_size=Buff_size,
             stream_from="vicon",  # 'vicon' or 'pytrigno',
@@ -63,7 +64,7 @@ class LiveData:
 
         self.type = type if type is not None else "TCP"
         self.timeout = timeout if timeout else 10000
-        self.read_frequency = read_frequency if read_frequency else acquisition_rate
+        self.stream_rate = stream_rate if stream_rate else acquisition_rate
         self.acquisition_rate = acquisition_rate
         self.emg_rate = None
         self.imu_rate = None
@@ -75,8 +76,8 @@ class LiveData:
         self.model_path = None
         self.proc_emg = None
         self.proc_imu = None
-        self.markers_dec = 6
-        self.emg_dec = 6
+        self.markers_dec = 5
+        self.emg_dec = 8
         self.buff_size = buff_size
         self.save_data = save_data
         self.raw_data = False
@@ -150,6 +151,7 @@ class LiveData:
             raise RuntimeError("Please provide mvc data to normalize emg signals or turn 'norm' to False")
         self.plot_emg = live_plot
         self.mvc_list = mvc
+        self.norm_emg = norm
         self.stream_emg = True
         self.interface.add_device(name=device_name, range=electrode_idx, type="emg", rate=rate)
         self.interface.devices[-1].process_method = None if not process else self.interface.devices[-1].process_method
@@ -163,17 +165,19 @@ class LiveData:
                     rate: float = 100,
                     unlabeled: bool = False,
                     compute_kin: bool = False,
-                    msk_model: str = None):
+                    msk_model: str = None,
+                    window = None):
         self.stream_markers = True
         self.nb_marks = nb_markers
         self.smooth_markers = smooth_traj
         self.recons_kalman = compute_kin
         self.model_path = msk_model
-        self.markers_windows = 200
+        self.markers_windows = window if window else rate
         if self.stream_from == "pytrigno":
             raise RuntimeError("Impossible to stream markers data from pytrigno.")
         else:
             self.interface.add_markers(name=marker_set_name, rate=rate, unlabeled=unlabeled, subject_name=subject)
+
         self.markers_rate = self.interface.markers[-1].rate
         self.markers_sample = self.interface.markers[-1].sample
 
@@ -194,13 +198,17 @@ class LiveData:
             print("[Warning] Debug mode without connection.")
 
         if self.offline_file_path:
-            data_exp = sio.loadmat(self.offline_file_path)
+            try:
+                data_exp = sio.loadmat(self.offline_file_path)
+            except:
+                data_exp = read_data(self.offline_file_path)
 
         if self.try_w_connection is not True:
             if self.stream_emg:
                 self.emg_sample = int(self.emg_rate / self.acquisition_rate)
-                if self.offline_file_path and "emg" in data_exp.keys():
-                    self.emg_exp = data_exp["emg"]
+                if self.offline_file_path and "raw_emg" in data_exp.keys():
+                    self.emg_exp = data_exp["raw_emg"]
+
                     self.nb_electrodes = self.emg_exp.shape[0]
                 else:
                     self.emg_exp = np.random.rand(self.nb_electrodes, int(self.emg_rate * self.offline_time))
@@ -280,19 +288,19 @@ class LiveData:
                                                        mvc_list=self.mvc_list,
                                                        norm_emg=self.norm_emg
                                                        )
-
                 self.emg_queue_out.put({"raw_emg": raw_emg, "emg_proc": emg_proc})
                 self.event_emg.set()
 
     def recons_kin(self):
         model, kalman, markers_data = None, None, None
+        model = biorbd.Model(self.model_path)
         if self.recons_kalman:
-            model = biorbd.Model(self.model_path)
             freq = self.markers_rate  # Hz
             params = biorbd.KalmanParam(freq)
             kalman = biorbd.KalmanReconsMarkers(model, params)
 
         while True:
+
             try:
                 markers_data = self.kin_queue_in.get_nowait()
                 is_working = True
@@ -302,9 +310,9 @@ class LiveData:
             if is_working:
                 markers = markers_data["markers"]
                 states = markers_data["states"]
-                markers_tmp = markers_data["markers_tmp"] * 0.001
+                markers_tmp = markers_data["markers_tmp"]
                 if self.recons_kalman:
-                    q_tmp, dq_tmp = kalman_func(markers_tmp, model, return_q_dot=True, kalman=kalman, return_kalman=False)
+                    q_tmp, dq_tmp = kalman_func(markers_tmp, model, return_q_dot=True, kalman=kalman, use_kalman=True)
                     states_tmp = np.concatenate((q_tmp, dq_tmp), axis=0)
                     if len(states) == 0:
                         states = states_tmp
@@ -348,7 +356,7 @@ class LiveData:
         absolute_time_frame = 0
         if self.try_w_connection:
             self.interface.init_client()
-        self.nb_marks = len(self.marker_names)
+        # self.nb_marks = len(self.marker_names)
         delta = 0
         delta_tmp = 0
         self.iter = 0
@@ -388,7 +396,8 @@ class LiveData:
                                 emg_tmp = all_device_data[i][:10, :]
                     else:
                         emg_tmp = self.emg_exp[: self.nb_electrodes, c: c + self.emg_sample]
-                        c = c + self.emg_sample if c < self.last_frame else self.init_frame
+                        c = c + self.emg_sample
+                        # c = c + self.emg_sample if c + self.emg_sample < self.last_frame else self.init_frame
                     self.emg_queue_in.put_nowait({"raw_emg": raw_emg, "emg_proc": emg_proc, "emg_tmp": emg_tmp})
                 if self.stream_markers:
                     if self.try_w_connection:
@@ -396,7 +405,8 @@ class LiveData:
                         markers_tmp = all_markers_tmp[0]
                     else:
                         markers_tmp = self.markers_exp[:, :, m: m + 1]
-                        m = m + 1 if m < self.last_frame else self.init_frame
+                        m = m + 1
+                        # m = m + 1 if m < self.last_frame else self.init_frame
                     self.kin_queue_in.put_nowait(
                         {
                             "states": states,
@@ -456,11 +466,13 @@ class LiveData:
 
                     if self.recons_kalman:
                         data_to_save["kalman"] = states[:, -1:]
-
                     save_data.add_data_to_pickle(data_to_save, self.output_file_path)
+
                 self.iter += 1
+            print(time() - tic)
             if not self.try_w_connection:
                 sleep(1/self.acquisition_rate)
+
 
 if __name__ == '__main__':
     server_ip = "127.0.0.1"
@@ -469,26 +481,53 @@ if __name__ == '__main__':
                            server_ports=server_ports,
                            stream_from="vicon",
                            device_host_ip="127.0.0.1",
-                           acquisition_rate=200)
-
+                           acquisition_rate=200,
+                           stream_rate=100,)
+    mvc_list = [0.00053701,
+                0.00046841,
+                0.00038598,
+                0.00078507,
+                0.00116109,
+                0.00091976,
+                0.0010177,
+                0.00099549,
+                0.00035016,
+                0.00035016,
+                ]
+    # mvc = sio.loadmat(f"data_final_new/subject_3/MVC_subject_3.mat")
+    # #["MVC_list_max"][0]
+    # mvc_list = [
+    #     mvc[0],  # MVC Pectoralis sternalis
+    #     mvc[1],  # MVC Deltoid anterior
+    #     mvc[2],  # MVC Deltoid medial
+    #     mvc[3],  # MVC Deltoid posterior
+    #     mvc[4],  # MVC Biceps brachii
+    #     mvc[5],  # MVC Triceps brachii
+    #     mvc[6],  # MVC Trapezius superior
+    #     mvc[7],  # MVC Trapezius medial
+    #     mvc[8],  # MVC Trapezius inferior
+    #     mvc[9],  # MVC Latissimus dorsi
+    # ]
     live_stream.add_emg_device(electrode_idx=(0, 9),
                                device_name="EMG",
                                process=True,
-                               norm=False,
+                               norm=True,
+                               mvc=mvc_list,
                                rate=2000)
     emg_processing = RealTimeProcessing()
     emg_processing.ma_win = 200
     live_stream.interface.devices[-1].set_process_method(emg_processing.process_emg)
 
     live_stream.add_markers(nb_markers=16,
-                            subject="Etienne",
+                            subject="subject_3",
                             smooth_traj=True,
                             rate=200,
                             unlabeled=False,
-                            compute_kin=True,
-                            msk_model="data_final/subject_1/model_subject_1_scaled.bioMod"
+                            compute_kin=False,
+                            msk_model="data_final_new/subject_3/wu_scaled.bioMod"
                             )
 
     live_stream.run(test_with_connection=False,
                     show_log=True,
-                    output_file_path="data_test")
+                    output_file_path="data_final_new/subject_3/data_abd_sans_poid_test_hh",
+                    offline_file_path="data_final_new/subject_3/data_abd_sans_poid")

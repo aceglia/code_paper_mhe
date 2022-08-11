@@ -124,20 +124,28 @@ def compute_force(sol: bioptim.Solution,
     if frame_to_save >= sol.states["q"].shape[1] - 1 + slide_size:
         raise RuntimeError(f"You can ask to save frame from 0 to {sol.states['q'].shape[1] + slide_size}."
                            f"You asked{frame_to_save}.")
-    force_est = np.zeros((nbmt, slide_size))
-    q_est = sol.states["q"][:, frame_to_save:frame_to_save + slide_size]
-    dq_est = sol.states["qdot"][:, frame_to_save:frame_to_save + slide_size]
+    # force_est = np.zeros((nbmt, slide_size))
+    # q_est = sol.states["q"][:, frame_to_save:frame_to_save + slide_size]
+    # dq_est = sol.states["qdot"][:, frame_to_save:frame_to_save + slide_size]
+    # if use_excitation:
+    #     a_est = sol.states["muscles"][:, frame_to_save:frame_to_save + slide_size]
+    #     u_est = sol.controls["muscles"][:, frame_to_save:frame_to_save + slide_size]
+    # else:
+    #     a_est = sol.controls["muscles"][:, frame_to_save:frame_to_save + slide_size]
+    #     u_est = a_est
+    q_est = sol.states["q"]
+    dq_est = sol.states["qdot"]
     if use_excitation:
-        a_est = sol.states["muscles"][:, frame_to_save:frame_to_save + slide_size]
-        u_est = sol.controls["muscles"][:, frame_to_save:frame_to_save + slide_size]
+        a_est = sol.states["muscles"]
+        u_est = sol.controls["muscles"]
     else:
-        a_est = sol.controls["muscles"][:, frame_to_save:frame_to_save + slide_size]
+        a_est = sol.controls["muscles"]
         u_est = a_est
 
-    for i in range(nbmt):
-        for j in range(slide_size):
-            force_est[i, j] = get_force(q_est[:, j], dq_est[:, j], a_est[:, j], u_est[:, j])[i, :]
-    return force_est, q_est, dq_est, a_est, u_est
+    # for i in range(nbmt):
+    #     for j in range(slide_size):
+    #         force_est[i, j] = get_force(q_est[:, j], dq_est[:, j], a_est[:, j], u_est[:, j])[i, :]
+    return q_est, dq_est, a_est, u_est
 
 
 def save_results(
@@ -183,7 +191,7 @@ def save_results(
     add_data_to_pickle(data, data_path)
 
 
-def muscle_mapping(muscles_target_tmp: np.ndarray, mvc_list: list, muscle_track_idx: list):
+def muscle_mapping(muscles_target_tmp: np.ndarray, muscle_track_idx: list, mvc_list=None):
     """
     Map the muscles to the right index.
 
@@ -211,9 +219,10 @@ def muscle_mapping(muscles_target_tmp: np.ndarray, mvc_list: list, muscle_track_
     muscles_target[[12], :] = muscles_target_tmp[7, :]
     muscles_target[[13], :] = muscles_target_tmp[8, :]
     muscles_target[[14], :] = muscles_target_tmp[9, :]
-    muscles_target = muscles_target / np.repeat(mvc_list, muscles_target_tmp.shape[1]).reshape(
-        len(mvc_list), muscles_target_tmp.shape[1]
-    )
+    if mvc_list:
+        muscles_target = muscles_target / np.repeat(mvc_list, muscles_target_tmp.shape[1]).reshape(
+            len(mvc_list), muscles_target_tmp.shape[1]
+        )
     return muscles_target
 
 
@@ -268,7 +277,7 @@ def get_data(ip=None,
              offline=False,
              offline_file_path=None):
     if offline:
-        nfinal = -1
+        nfinal = -100
         if offline_file_path[-4:] == ".mat":
             mat = sio.loadmat(offline_file_path)
             x_ref, markers, muscles = mat["kalman"], mat["markers"], mat["emg_proc"]
@@ -278,8 +287,9 @@ def get_data(ip=None,
             try:
                 x_ref, markers, muscles = mat["kalman"], mat["kin_target"], mat["muscles_target"]
             except:
-                x_ref, markers, muscles = mat["kalman"][:, :nfinal], mat["markers"][:, 4:, :nfinal], mat["emg"][:,
-                                                                                                     :nfinal]
+                x_ref, markers, muscles = mat["kalman"][:, :nfinal],\
+                                          mat["markers"][:, 4:, :nfinal],\
+                                          mat["emg_proc"][:, :nfinal]
         return x_ref, markers, muscles
     else:
         client = Client(ip, port, "TCP")
