@@ -74,8 +74,8 @@ def initialize(model_path: str, data_dir: str, scaling: bool = False, off_line: 
     mass : int, optional
         Mass of the subject. The default is None.
     """
-    mat = read_data(f"{data_dir}/{trial}")
-    markers = mat["markers"][:3, :, :20]
+    mat = read_data(f"{data_dir}/C3D/{trial}")
+    markers = mat["markers"][:3, :, :50]
 
     # Define the name of the model's markers
     marker_names = [
@@ -178,53 +178,53 @@ def convert_model(in_path: str, out_path: str, viz: bool = None):
 
 
 if __name__ == "__main__":
-    trial = [
+    trial = ["data_abd_sans_poid"]
         # "data_abd_poid_2kg",
         # "data_flex_sans_poid",
-        #      "data_abd_sans_poid",
+
         #      "data_cycl_poid_2kg",
-             "data_cycl_sans_poid",
+        #      "data_cycl_sans_poid",
         # "data_flex_poid_2k",
 
-    ]
+
     # trial = trial[0]
-    model_path = "data_final_new/subject_3/wu_scaled.bioMod"
+    model_path = "data_final_new/subject_3/C3D/wu_scaled.bioMod"
     model = biorbd.Model(model_path)
-    for i in trial:
-        results_mat_abd = read_data(f"data_final_new/subject_3/{i}")
-        # results_mat_flex = read_data(f"data_final_new/subject_3/{trial}")
-        # convert_model(f"data_final_new/subject_3/wu_scaled.osim", f"data_final_new/subject_3/wu_scaled.bioMod", viz=True)
-        # model_path = f"{data_dir}/wu.osim"
-        # # model = biorbd.Model(model_path)
-
-        q_recons, q_dot = kalman_func(results_mat_abd["markers"][:, :, 1000:], return_q_dot=True, model=model, use_kalman=True)
-        import numpy as np
-
-        # def finite_difference(data, f):
-        #     t = np.linspace(0, data.shape[0] / f, data.shape[0])
-        #     y = data
-        #     dydt = np.gradient(y, t)
-        #     return dydt
-        import matplotlib.pyplot as plt
-        for s in range(len(trial)):
-            plt.figure("markers")
-            for i in range(model.nbMarkers()):
-                plt.subplot(4, 4, i + 1)
-                plt.plot(results_mat_abd["markers"][0, i, 1000:].T, "-r")
-                plt.plot(results_mat_abd["markers"][1, i, 1000:].T, "-r")
-                plt.plot(results_mat_abd["markers"][2, i, 1000:].T, "-r")
-        plt.show()
-        b = bioviz.Viz(model_path=model_path)
-        b.load_movement(q_recons)
-        b.load_experimental_markers(results_mat_abd["markers"][:, :, 1000:])
-        b.exec()
-        # q_dot = np.copy(q_recons)
-        # for j in range(q_recons.shape[0]):
-        #     q_dot[j, :] = finite_difference(q_recons[j, :], 100)
-        results_mat_abd["emg_proc"] = results_mat_abd["emg_proc"][:, 1000:]
-        results_mat_abd["markers"] = results_mat_abd["markers"][:, :, 1000:]
-        results_mat_abd["kalman"] = np.concatenate((q_recons, q_dot), axis=0)
-        add_data_to_pickle(results_mat_abd, f"{i}_test")
+    # for i in trial:
+        # results_mat_abd = read_data(f"data_final_new/subject_3/{i}")
+        # # results_mat_flex = read_data(f"data_final_new/subject_3/{trial}")
+        # # convert_model(f"data_final_new/subject_3/wu_scaled.osim", f"data_final_new/subject_3/wu_scaled.bioMod", viz=True)
+        # # model_path = f"{data_dir}/wu.osim"
+        # # # model = biorbd.Model(model_path)
+        #
+        # q_recons, q_dot = kalman_func(results_mat_abd["markers"][:, :, 1000:], return_q_dot=True, model=model, use_kalman=True)
+        # import numpy as np
+        #
+        # # def finite_difference(data, f):
+        # #     t = np.linspace(0, data.shape[0] / f, data.shape[0])
+        # #     y = data
+        # #     dydt = np.gradient(y, t)
+        # #     return dydt
+        # import matplotlib.pyplot as plt
+        # for s in range(len(trial)):
+        #     plt.figure("markers")
+        #     for i in range(model.nbMarkers()):
+        #         plt.subplot(4, 4, i + 1)
+        #         plt.plot(results_mat_abd["markers"][0, i, 1000:].T, "-r")
+        #         plt.plot(results_mat_abd["markers"][1, i, 1000:].T, "-r")
+        #         plt.plot(results_mat_abd["markers"][2, i, 1000:].T, "-r")
+        # plt.show()
+        # b = bioviz.Viz(model_path=model_path)
+        # b.load_movement(q_recons)
+        # b.load_experimental_markers(results_mat_abd["markers"][:, :, 1000:])
+        # b.exec()
+        # # q_dot = np.copy(q_recons)
+        # # for j in range(q_recons.shape[0]):
+        # #     q_dot[j, :] = finite_difference(q_recons[j, :], 100)
+        # results_mat_abd["emg_proc"] = results_mat_abd["emg_proc"][:, 1000:]
+        # results_mat_abd["markers"] = results_mat_abd["markers"][:, :, 1000:]
+        # results_mat_abd["kalman"] = np.concatenate((q_recons, q_dot), axis=0)
+        # add_data_to_pickle(results_mat_abd, f"{i}_test")
 
 
     # import matplotlib.pyplot as plt
@@ -243,7 +243,7 @@ if __name__ == "__main__":
     mass = 72
     mass_scaling = mass * 0.578 + mass * 0.050
     data_dir = f"data_final_new/{subject}"
-    model_path = f"{data_dir}/wu_scaled.bioMod"
+    model_path = f"{data_dir}/C3D/wu_scaled.bioMod"
     # convert_model(f"{data_dir}/wu_scaled_markers.osim", f"{data_dir}/wu_scaled_markers.bioMod", viz=True)
     # model_path = f"{data_dir}/wu.osim"
     trial = trial[0]

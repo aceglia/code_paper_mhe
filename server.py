@@ -1,7 +1,7 @@
-
+import sys
 from typing import Union
 
-
+import glob
 try:
     from pythonosc.udp_client import SimpleUDPClient
 
@@ -208,7 +208,7 @@ class LiveData:
                 self.emg_sample = int(self.emg_rate / self.acquisition_rate)
                 if self.offline_file_path and "raw_emg" in data_exp.keys():
                     self.emg_exp = data_exp["raw_emg"]
-
+                    print(self.emg_exp.shape)
                     self.nb_electrodes = self.emg_exp.shape[0]
                 else:
                     self.emg_exp = np.random.rand(self.nb_electrodes, int(self.emg_rate * self.offline_time))
@@ -221,7 +221,8 @@ class LiveData:
                 else:
                     self.nb_marks = self.nb_electrodes
                 if self.offline_file_path and "markers" in data_exp.keys():
-                    self.markers_exp = data_exp["markers"][:3, :, :]
+                    self.markers_exp = data_exp["markers"][:3, :, :] * 0.001
+                    print(self.markers_exp.shape)
                     self.nb_marks = self.markers_exp.shape[0]
                 else:
                     self.markers_exp = np.random.rand(3, self.nb_marks, int(self.markers_rate * self.offline_time))
@@ -404,7 +405,9 @@ class LiveData:
                         all_markers_tmp, all_occluded = self.interface.get_markers_data()
                         markers_tmp = all_markers_tmp[0]
                     else:
-                        markers_tmp = self.markers_exp[:, :, m: m + 1]
+                        if m == self.markers_exp.shape[2]:
+                            sys.exit()
+                        markers_tmp = self.markers_exp[:, :, m][:, :, np.newaxis]
                         m = m + 1
                         # m = m + 1 if m < self.last_frame else self.init_frame
                     self.kin_queue_in.put_nowait(
@@ -481,19 +484,21 @@ if __name__ == '__main__':
                            server_ports=server_ports,
                            stream_from="vicon",
                            device_host_ip="127.0.0.1",
-                           acquisition_rate=200,
+                           acquisition_rate=100,
                            stream_rate=100,)
-    mvc_list = [0.00053701,
-                0.00046841,
-                0.00038598,
-                0.00078507,
-                0.00116109,
-                0.00091976,
-                0.0010177,
-                0.00099549,
-                0.00035016,
-                0.00035016,
-                ]
+    # mvc_list = [0.00053701,
+    #             0.00046841,
+    #             0.00038598,
+    #             0.00078507,
+    #             0.00116109,
+    #             0.00091976,
+    #             0.0010177,
+    #             0.00099549,
+    #             0.00035016,
+    #             0.00035016,
+    #             ]
+    mvc_list = [0.00059407, 0.00048661, 0.00043323, 0.00102025, 0.0012863,  0.00117913,
+     0.00115778, 0.00371461, 0.00042165, 0.00028015]
     # mvc = sio.loadmat(f"data_final_new/subject_3/MVC_subject_3.mat")
     # #["MVC_list_max"][0]
     # mvc_list = [
@@ -515,19 +520,19 @@ if __name__ == '__main__':
                                mvc=mvc_list,
                                rate=2000)
     emg_processing = RealTimeProcessing()
-    emg_processing.ma_win = 200
+    emg_processing.ma_win = 600
     live_stream.interface.devices[-1].set_process_method(emg_processing.process_emg)
 
     live_stream.add_markers(nb_markers=16,
                             subject="subject_3",
                             smooth_traj=True,
-                            rate=200,
+                            rate=100,
                             unlabeled=False,
-                            compute_kin=False,
+                            compute_kin=True,
                             msk_model="data_final_new/subject_3/wu_scaled.bioMod"
                             )
 
     live_stream.run(test_with_connection=False,
                     show_log=True,
-                    output_file_path="data_final_new/subject_3/data_abd_sans_poid_test_hh",
-                    offline_file_path="data_final_new/subject_3/data_abd_sans_poid")
+                    output_file_path="data_final_new/subject_3/C3D/data_flex_sans_poid",
+                    offline_file_path="data_final_new/subject_3/C3D/flex_sans_poid")

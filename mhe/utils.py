@@ -288,7 +288,7 @@ def get_data(ip=None,
                 x_ref, markers, muscles = mat["kalman"], mat["kin_target"], mat["muscles_target"]
             except:
                 x_ref, markers, muscles = mat["kalman"][:, :nfinal],\
-                                          mat["markers"][:, 4:, :nfinal],\
+                                          mat["markers"][:, :, :nfinal],\
                                           mat["emg_proc"][:, :nfinal]
         return x_ref, markers, muscles
     else:

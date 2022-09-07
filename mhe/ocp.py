@@ -26,6 +26,7 @@ from bioptim import (
     OptimalControlProgram,
     Solution,
     DynamicsFunctions,
+    DynamicsEvaluation,
 )
 
 
@@ -96,34 +97,6 @@ def force_func(biorbd_model: biorbd.Model, use_excitation: bool = False):
         ["qMX", "dqMX", "aMX", "uMX"],
         ["Force"],
     ).expand()
-
-
-def get_reference_data(file_path: str):
-    """
-    Get the reference data from a .mat file or pickle file. Keys must be well define to be found.
-
-    Parameters
-    ----------
-    file_path : str
-        Path to the file.
-
-    Returns
-    -------
-    Reference data.
-    """
-    nfinal = -1
-    if file_path[-4:] == ".mat":
-        mat = sio.loadmat(file_path)
-        x_ref, markers, muscles = mat["kalman"], mat["markers"], mat["emg_proc"]
-
-    else:
-        mat = read_data(file_path)
-        try:
-            x_ref, markers, muscles = mat["kalman"], mat["kin_target"], mat["muscles_target"]
-        except:
-            x_ref, markers, muscles = mat["kalman"][:, :nfinal], mat["markers"][:, 4:, :nfinal], mat["emg"][:, :nfinal]
-    return x_ref, markers, muscles
-
 
 def define_objective(
     weights: dict,
@@ -203,8 +176,18 @@ def define_objective(
             weight=kin_weight,
             target=kin_target,
             node=Node.ALL,
+            #index=range(4, 16),
             multi_thread=False,
         )
+        #objectives.add(
+        #    kin_funct,
+        #    weight=kin_weight/10000,
+        #    target=kin_target[:, :4, :],
+        #    node=Node.ALL,
+        #    index=range(0, 4),
+        #    multi_thread=False,
+        #)
+
     elif kin_data_to_track == "q":
         objectives.add(kin_funct, weight=kin_weight, target=kin_target, key="q", node=Node.ALL, multi_thread=False)
 
@@ -248,7 +231,7 @@ def custom_muscles_driven(
         controls: MX.sym,
         parameters: MX.sym,
         nlp,
-) -> MX:
+):
     """
     Forward dynamics driven by muscle.
 
@@ -278,10 +261,16 @@ def custom_muscles_driven(
         if i > 4 and i != nlp.model.nbQ() - 1:
             residual_tau[i] = MX(0)
 
+
+
     tau = muscles_tau + residual_tau if residual_tau is not None else muscles_tau
     dq = DynamicsFunctions.compute_qdot(nlp, q, qdot)
     ddq = DynamicsFunctions.forward_dynamics(nlp, q, qdot, tau, False)
-    return dq, ddq
+    dxdt = MX(nlp.states.shape, ddq.shape[1])
+    dxdt[nlp.states["q"].index, :] = horzcat(*[dq for _ in range(ddq.shape[1])])
+    dxdt[nlp.states["qdot"].index, :] = ddq
+
+    return DynamicsEvaluation(dxdt=dxdt, defects=None)
 
 
 def prepare_problem(
@@ -329,7 +318,7 @@ def prepare_problem(
     """
     biorbd_model = biorbd.Model(model_path)
     nbGT = biorbd_model.nbGeneralizedTorque() if use_torque else 0
-    tau_min, tau_max, tau_init = -25, 25, 0
+    tau_min, tau_max, tau_init = -30, 30, 0
     muscle_min, muscle_max, muscle_init = 0, 1, 0.1
 
     # Dynamics
@@ -449,13 +438,13 @@ def configure_weights():
     # }
     # avec poids
     weights = {
-        "track_markers": 10000000000000,
+        "track_markers": 10000000000000000,
         "track_q": 100000000000000,
         "min_control": 10000000,
         "min_dq": 1000,
         "min_q": 1,
         "min_torque": 1000,
-        "track_emg": 100000000000,
+        "track_emg": 1000000000,
         "min_activation": 10,
 
     }

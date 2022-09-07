@@ -138,7 +138,7 @@ class MuscleForceEstimator:
                                    )
             data = get_data(ip=self.server_ip, port=self.server_port, message=self.message)
             x_ref = np.array(data["kalman"])
-            markers_target = np.array(data["markers"])[:, 4:, :]
+            markers_target = np.array(data["markers"])[:, :, :]
             muscles_target = np.array(data["emg_proc"])
 
         # x_ref = read_data(f"data_final_new/subject_3/data_abd_poid_2kg_test")["kalman"]
@@ -319,68 +319,68 @@ class MuscleForceEstimator:
             export_options={"frame_to_export": self.frame_to_save},
             solver=self.solver,
         )
-        integrator = SolutionIntegrator.SCIPY_RK45
-        sol_rk45 = sol.integrate(shooting_type=Shooting.SINGLE_CONTINUOUS, merge_phases=True, integrator=integrator
-                                )
-
+        # integrator = SolutionIntegrator.SCIPY_RK45
+        # sol_rk45 = sol.integrate(shooting_type=Shooting.SINGLE_CONTINUOUS, merge_phases=True, integrator=integrator
+        #                         )
+        #
         def rmse(data, data_ref):
             return np.sqrt(((data - data_ref) ** 2).mean())
 
         def std(data, data_ref):
             return np.sqrt(((data - data_ref) ** 2).std())
-
-        print(f"rmse : {rmse(sol_rk45.states['q'][:, :33], sol.states['q'][:, :33]) * 180/np.pi}")
-        print(f"std : { std(sol_rk45.states['q'][:, :33], sol.states['q'][:, :33]) * 180/np.pi}")
-
-        # integrator = SolutionIntegrator.SCIPY_DOP853
-        # sol_dop = sol.integrate(shooting_type=Shooting.SINGLE_CONTINUOUS, merge_phases=True, integrator=integrator
-        #                         )
-        # integrator = SolutionIntegrator.SCIPY_LSODA
-        # sol_lsoda = sol.integrate(shooting_type=Shooting.SINGLE_CONTINUOUS, merge_phases=True, integrator=integrator
-        #                         )
-        # integrator = SolutionIntegrator.SCIPY_BDF
-        # sol_bdf = sol.integrate(shooting_type=Shooting.SINGLE_CONTINUOUS, merge_phases=True, integrator=integrator
-        #                         )
-
+        #
+        #print(f"rmse : {rmse(sol_rk45.states['q'][:, :33], sol.states['q'][:, :33]) * 180/np.pi}")
+        #print(f"std : { std(sol_rk45.states['q'][:, :33], sol.states['q'][:, :33]) * 180/np.pi}")
+        #
+        # # integrator = SolutionIntegrator.SCIPY_DOP853
+        # # sol_dop = sol.integrate(shooting_type=Shooting.SINGLE_CONTINUOUS, merge_phases=True, integrator=integrator
+        # #                         )
+        # # integrator = SolutionIntegrator.SCIPY_LSODA
+        # # sol_lsoda = sol.integrate(shooting_type=Shooting.SINGLE_CONTINUOUS, merge_phases=True, integrator=integrator
+        # #                         )
+        # # integrator = SolutionIntegrator.SCIPY_BDF
+        # # sol_bdf = sol.integrate(shooting_type=Shooting.SINGLE_CONTINUOUS, merge_phases=True, integrator=integrator
+        # #                         )
+        #
         import matplotlib.pyplot as plt
         q_est = sol.states["q"]
         qdot_est = sol.states["qdot"]
-        qdot_dif = np.copy(qdot_est)
-
+        # qdot_dif = np.copy(qdot_est)
+        #
         kalman = self.mhe.kalman
-        def finite_difference(data):
-            t = np.linspace(0, data.shape[0] / 100, data.shape[0])
-            y = data
-            dydt = np.gradient(y, t)
-            return dydt
-        for i in range(qdot_est.shape[0]):
-            qdot_dif[i, :] = finite_difference(q_est[i, :])
-
-        plt.figure("q_dot")
-        # t_est = np.linspace(0, q_est.shape[1]/35, q_est.shape[1])
-        # t = np.linspace(0, kalman.shape[1]/100, kalman.shape[1])
-
-        for i in range(self.model.nbQ()):
-            plt.subplot(4, 3, i + 1)
-            plt.plot(qdot_est[i, :] * 180 / np.pi, label="qdot_est")
-            plt.plot(qdot_dif[i, :] * 180 / np.pi, label="qdot_dif")
-            plt.plot(sol_rk45.states["qdot"][i, :] * 180 / np.pi, label="qdot_int_rk")
-            # plt.plot(sol_lsoda.states["qdot"][i, :] * 180 / np.pi, label="qdot_lsoda")
-            # plt.plot(sol_bdf.states["qdot"][i, :] * 180 / np.pi, label="qdot_bdf")
-            # plt.plot(sol_dop.states["qdot"][i, :] * 180 / np.pi, label="qdot_dop")
-
-            # plt.plot(t, qdot[i, :] * 180 / np.pi, label="qdotkalman")
-            # plt.title(model.nameDof()[i].to_string())
-        plt.legend()
+        # def finite_difference(data):
+        #     t = np.linspace(0, data.shape[0] / 100, data.shape[0])
+        #     y = data
+        #     dydt = np.gradient(y, t)
+        #     return dydt
+        # for i in range(qdot_est.shape[0]):
+        #     qdot_dif[i, :] = finite_difference(q_est[i, :])
+        #
+        # plt.figure("q_dot")
+        # # t_est = np.linspace(0, q_est.shape[1]/35, q_est.shape[1])
+        # # t = np.linspace(0, kalman.shape[1]/100, kalman.shape[1])
+        #
+        # for i in range(self.model.nbQ()):
+        #     plt.subplot(4, 3, i + 1)
+        #     plt.plot(qdot_est[i, :] * 180 / np.pi, label="qdot_est")
+        #     plt.plot(qdot_dif[i, :] * 180 / np.pi, label="qdot_dif")
+        #     plt.plot(sol_rk45.states["qdot"][i, :] * 180 / np.pi, label="qdot_int_rk")
+        #     # plt.plot(sol_lsoda.states["qdot"][i, :] * 180 / np.pi, label="qdot_lsoda")
+        #     # plt.plot(sol_bdf.states["qdot"][i, :] * 180 / np.pi, label="qdot_bdf")
+        #     # plt.plot(sol_dop.states["qdot"][i, :] * 180 / np.pi, label="qdot_dop")
+        #
+        #     # plt.plot(t, qdot[i, :] * 180 / np.pi, label="qdotkalman")
+        #     # plt.title(model.nameDof()[i].to_string())
+        # plt.legend()
         plt.figure("q")
         for i in range(self.model.nbQ()):
             plt.subplot(4, 3, i + 1)
             plt.plot(q_est[i, :] * 180 / np.pi, label="q_est")
-            plt.plot(sol_rk45.states["q"][i, :] * 180 / np.pi, label="q_int_rk")
+            plt.plot(sol_rk45.states["q"][i, :] * (180 / np.pi), label="q_int_rk")
             # plt.plot(sol_lsoda.states["q"][i, :] * 180 / np.pi, label="q_lsoda")
             # plt.plot(sol_bdf.states["q"][i, :] * 180 / np.pi, label="q_bdf")
             # plt.plot(sol_dop.states["q"][i, :] * 180 / np.pi, label="q_dop")
-            plt.plot(kalman[i, :] * 180 / np.pi, label="kalman")
+            plt.plot(kalman[i, :] * (180 / np.pi), label="kalman")
             # plt.plot(self.x_ref[i, :] * 180 / np.pi, label="x_ref")
             # plt.plot(t, qdot[i, :] * 180 / np.pi, label="qdotkalman")
             # plt.title(model.nameDof()[i].to_string())
@@ -389,7 +389,7 @@ class MuscleForceEstimator:
         for j in range(q_est.shape[0]):
             for i in range(q_est.shape[1]):
                 rmse_q[j, i] = rmse(sol_rk45.states['q'][j, i] * (180/np.pi), sol.states['q'][j, i] * (180/np.pi))
-
+        #
         plt.figure("rmse integrate")
         t = np.linspace(0, q_est.shape[1] / 33, q_est.shape[1])
         for i in range(q_est.shape[0]):
@@ -402,7 +402,7 @@ class MuscleForceEstimator:
 
 if __name__ == "__main__":
     subject = f"subject_3"
-    data_dir = f"data_final_new/{subject}/"
+    data_dir = f"data_final_new/{subject}/C3D/"
     # data_dir = f"data_final/"
 
     # mvc = sio.loadmat(data_dir + f"MVC_{subject}.mat")["MVC_list_max"][0]
@@ -420,23 +420,32 @@ if __name__ == "__main__":
     #     mvc[5],  # MVC Triceps brachii
     #     mvc[6],  # MVC Trapezius superior
     #     mvc[6],  # MVC Trapezius superior
+
     #     mvc[7],  # MVC Trapezius medial
     #     mvc[8],  # MVC Trapezius inferior
     #     mvc[9],  # MVC Latissimus dorsi
     # ]
 
     # result_dir = data_dir
-    result_dir = data_dir
+    result_dir = "/home/amedeoceglia/Documents/programmation/code_paper_mhe/data_final_new/subject_3/C3D/results_w3"
     trials = [
-        "data_abd_poid_2kg_test", "data_flex_poid_2k_test",
-        "data_abd_sans_poid_test", "data_flex_sans_poid_test"
+        #"data_abd_sans_poid",
+        "data_abd_poid_2kg",
+         "data_cycl_poid_2kg"
+        , "data_flex_poid_2kg",
+        # "data_flex_sans_poid",
+         #"data_cycl_sans_poid",
+         "data_abd_poid_3_6kg", "data_flex_poid_3_6kg", "data_cycl_poid_3_6kg"
     ]
     # trials = ["abd_w_dq"]
     #, "flex_w_dq", "cycl_w_dq", "abd_cocon_w_dq", "flex_cocon_w_dq", "cycl_cocon_w_dq"]
-    configs = [0.05, 0.08, 0.1, 1.2, 1.5]  # , "mhe"]
+    configs = [0.04, 0.05, 0.06, 0.07, 0.08, 0.09, 0.1, 0.11, 0.12]#, 0.08, 0.1, 1.2, 1.5]  # , "mhe"]
+    # configs = [0.08]
+    # exp_freq = [14]
+    # exp_freq = [28, 27, 21, 19, 18, 16, 14, 13, 13]
     # configs = [0.1]
 
-    for config in configs:
+    for c,  config in enumerate(configs):
         for trial in trials:
             offline_path = data_dir + f"{trial}"
             file_name = f"{trial}_result_duration_{config}"
@@ -474,6 +483,7 @@ if __name__ == "__main__":
                     23,
                     24,  # MVC Pectoralis sternalis
                     13,  # MVC Deltoid anterior
+
                     15,  # MVC Deltoid medial
                     16,  # MVC Deltoid posterior
                     26,

@@ -117,21 +117,21 @@ def read_sto_mot_file(filename):
 if __name__ == '__main__':
     plot = True
     subject = "subject_3"
-    data_dir = f"data_final_new/{subject}"
+    data_dir = f"data_final_new/{subject}/C3D/"
 
     # Torque from muscle activations
-    bmodel_path = f"data_final_new/{subject}/wu_scaled.bioMod"
+    bmodel_path = f"data_final_new/{subject}/C3D/wu_scaled_cylinder.bioMod"
     # bmodel_path = f"data_final_new/subject_1/model_subject_1_scaled.bioMod"
     model = biorbd.Model(bmodel_path)
     # model = biorbd.Model(f"data_final_new/subject_1/model_subject_1_scaled.bioMod")
-    data = read_data(f"{data_dir}/data_abd_sans_poid_test")
-    estimated = read_data(f"{data_dir}/data_abd_sans_poid_test_result_frame_008_0")
+    data = read_data(f"{data_dir}/data_abd_sans_poid")
+    estimated = read_data(f"{data_dir}/data_abd_poid_2kg_result_duration_0.1")
     # estimated = read_data(f"{data_dir}/abd_cocon_w_dq_result")
-
-    activation = estimated["U_est"]
+    nb_mhe = int(estimated["Nmhe"][0] + 1)
+    activation = estimated["U_est"][:, ::nb_mhe]
     nb_q = model.nbQ()
-    q_est = estimated["X_est"][:nb_q, :]
-    qdot_est = estimated["X_est"][nb_q:, :]
+    q_est = estimated["X_est"][:nb_q, ::nb_mhe]
+    qdot_est = estimated["X_est"][nb_q:, ::nb_mhe]
     qdot_dif = np.copy(qdot_est)
     dofs = ["Sterno-claviculaire rot_x",
             "Sterno-claviculaire rot_y",
@@ -153,25 +153,25 @@ if __name__ == '__main__':
         muscular_torque[:, i] = model.muscularJointTorque(states, q_est[:, i], qdot_est[:, i]).to_array()
 
     if "tau_est" in estimated.keys():
-        estimated_torque = muscular_torque + estimated["tau_est"]
+        estimated_torque = muscular_torque + estimated["tau_est"][:, ::nb_mhe]
     else:
         estimated_torque = muscular_torque
 
     # Torque from ID
     # q, qdot = kalman_func(data["markers"][:, :, 350:-100], model, use_kalman=False)
-    q = estimated["kalman"][:nb_q, :]
-    qdot = estimated["kalman"][nb_q:nb_q * 2, :]
+    q = estimated["kalman"][:nb_q, ::nb_mhe]
+    qdot = estimated["kalman"][nb_q:nb_q * 2, ::nb_mhe]
     # q = estimated["X_est"][:nb_q, :]
     # qdot = estimated["X_est"][nb_q:nb_q * 2, :]
-    t = np.linspace(0, q.shape[1]/100, q.shape[1])
+    t = np.linspace(0, q.shape[1]/33, q.shape[1])
     # qdot = np.zeros((q.shape[0], q.shape[1]))
     qddot = np.zeros((q.shape[0], q.shape[1]))
     # qdot = OfflineProcessing().butter_lowpass_filter(qdot, 2, 100, 4)
     for i in range(q.shape[0]):
-        qdot[i, :] = finite_difference(q[i, :], 100)
+        qdot[i, :] = finite_difference(q[i, :], 33)
         # qdot[i, :] = OfflineProcessing().butter_lowpass_filter(qdot[i, :], 2, 100, 4)
-        qddot[i, :] = finite_difference(qdot[i, :], 100)
-    qddot = OfflineProcessing().butter_lowpass_filter(qddot, 2, 100, 4)
+        qddot[i, :] = finite_difference(qdot[i, :], 33)
+    qddot = OfflineProcessing().butter_lowpass_filter(qddot, 2, 33, 4)
 
     tau_from_b = np.zeros((model.nbQ(), q.shape[1]))
     for i in range(q.shape[1]):
@@ -185,7 +185,7 @@ if __name__ == '__main__':
         for i in range(nb_q):
             plt.subplot(4, 3, i + 1)
             plt.plot(t_est, qdot_est[i, :] * (180 / np.pi), label="qdot_est")
-            plt.plot(t, estimated["kalman"][nb_q:nb_q * 2, :][i,:] * (180 / np.pi), label="qdotkalman")
+            plt.plot(t, estimated["kalman"][nb_q:nb_q * 2, ::nb_mhe][i,:] * (180 / np.pi), label="qdotkalman")
             plt.title(model.nameDof()[i].to_string())
         plt.legend()
 
@@ -206,7 +206,7 @@ if __name__ == '__main__':
             plt.plot(t, tau_from_b[i, :], 'r', label="Couples par dynamique inverse (biorbd)")
             plt.plot(t_est, estimated_torque[i, :], label="Couples éstimés")
             plt.plot(t_est, muscular_torque[i, :], '--', label="Couples provenant des forces musculaires éstimés", )
-            plt.plot(t_est, estimated["tau_est"][i, :], '-.', label="Couples résiduels éstimés")
+            plt.plot(t_est, estimated["tau_est"][i, ::nb_mhe], '-.', label="Couples résiduels éstimés")
             plt.title(dofs[i])
             if i in [6,7,8]:
                 plt.xlabel("Temps (s)")
