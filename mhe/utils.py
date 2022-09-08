@@ -215,10 +215,10 @@ def muscle_mapping(muscles_target_tmp: np.ndarray, muscle_track_idx: list, mvc_l
     muscles_target[5, :] = muscles_target_tmp[3, :]
     muscles_target[[6, 7], :] = muscles_target_tmp[4, :]
     muscles_target[[8, 9, 10], :] = muscles_target_tmp[5, :]
-    muscles_target[[11], :] = muscles_target_tmp[6, :]
-    muscles_target[[12], :] = muscles_target_tmp[7, :]
-    muscles_target[[13], :] = muscles_target_tmp[8, :]
-    muscles_target[[14], :] = muscles_target_tmp[9, :]
+    muscles_target[[11, 12], :] = muscles_target_tmp[6, :]
+    muscles_target[[13], :] = muscles_target_tmp[7, :]
+    muscles_target[[14], :] = muscles_target_tmp[8, :]
+    muscles_target[[15], :] = muscles_target_tmp[9, :]
     if mvc_list:
         muscles_target = muscles_target / np.repeat(mvc_list, muscles_target_tmp.shape[1]).reshape(
             len(mvc_list), muscles_target_tmp.shape[1]
