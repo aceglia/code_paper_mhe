@@ -2,6 +2,7 @@ import sys
 from typing import Union
 
 import glob
+
 try:
     from pythonosc.udp_client import SimpleUDPClient
 
@@ -46,16 +47,16 @@ Buff_size = 100000
 
 class LiveData:
     def __init__(
-            self,
-            server_ip,
-            server_ports=(),
-            type=None,
-            acquisition_rate=100,
-            stream_rate=None,
-            timeout=None,
-            buff_size=Buff_size,
-            stream_from="vicon",  # 'vicon' or 'pytrigno',
-            device_host_ip="127.0.0.1",  # localhost
+        self,
+        server_ip,
+        server_ports=(),
+        type=None,
+        acquisition_rate=100,
+        stream_rate=None,
+        timeout=None,
+        buff_size=Buff_size,
+        stream_from="vicon",  # 'vicon' or 'pytrigno',
+        device_host_ip="127.0.0.1",  # localhost
     ):
 
         # problem variables
@@ -130,21 +131,23 @@ class LiveData:
         self.count_server = 0
         self.count_osc = 0
         self.stream_from = stream_from
-        if self.stream_from == 'vicon':
+        if self.stream_from == "vicon":
             self.interface = vicon_interface.ViconClient(ip=device_host_ip, port=801, init_now=False)
-        elif self.stream_from == 'pytrigno':
+        elif self.stream_from == "pytrigno":
             self.interface = pytrigno_interface.PytrignoClient(ip=device_host_ip)
         else:
             raise RuntimeError(f"{self.stream_from} is not implemented. Please stream data from vicon or pytrigno")
 
-    def add_emg_device(self,
-                       electrode_idx: Union[int, tuple],
-                       device_name: Union[str, list] = None,
-                       process: bool = True,
-                       norm: bool = False,
-                       mvc: list = None,
-                       live_plot: bool = False,
-                       rate: float = 2000):
+    def add_emg_device(
+        self,
+        electrode_idx: Union[int, tuple],
+        device_name: Union[str, list] = None,
+        process: bool = True,
+        norm: bool = False,
+        mvc: list = None,
+        live_plot: bool = False,
+        rate: float = 2000,
+    ):
 
         self.nb_electrodes = (electrode_idx[1] - electrode_idx[0]) + 1 if isinstance(electrode_idx, tuple) else 1
         if norm and not mvc:
@@ -158,15 +161,18 @@ class LiveData:
         self.emg_sample = self.interface.devices[-1].sample
         self.emg_rate = self.interface.devices[-1].rate
 
-    def add_markers(self, nb_markers: int,
-                    marker_set_name: str = None,
-                    subject: str = None,
-                    smooth_traj: bool = None,
-                    rate: float = 100,
-                    unlabeled: bool = False,
-                    compute_kin: bool = False,
-                    msk_model: str = None,
-                    window = None):
+    def add_markers(
+        self,
+        nb_markers: int,
+        marker_set_name: str = None,
+        subject: str = None,
+        smooth_traj: bool = None,
+        rate: float = 100,
+        unlabeled: bool = False,
+        compute_kin: bool = False,
+        msk_model: str = None,
+        window=None,
+    ):
         self.stream_markers = True
         self.nb_marks = nb_markers
         self.smooth_markers = smooth_traj
@@ -182,12 +188,12 @@ class LiveData:
         self.markers_sample = self.interface.markers[-1].sample
 
     def run(
-            self,
-            test_with_connection=True,
-            save_data=True,
-            output_file_path=None,
-            offline_file_path=None,
-            show_log=False,
+        self,
+        test_with_connection=True,
+        save_data=True,
+        output_file_path=None,
+        offline_file_path=None,
+        show_log=False,
     ):
         self.save_data = save_data
         self.output_file_path = output_file_path
@@ -271,7 +277,7 @@ class LiveData:
         c = 0
         emg_process_method = None
         for device in self.interface.devices:
-            if device.type == 'emg':
+            if device.type == "emg":
                 emg_process_method = device.get_process_method()
         while True:
             try:
@@ -283,12 +289,9 @@ class LiveData:
             if is_working:
                 emg_tmp = emg_data["emg_tmp"]
                 raw_emg, emg_proc = emg_data["raw_emg"], emg_data["emg_proc"]
-                raw_emg, emg_proc = emg_process_method(raw_emg,
-                                                       emg_proc,
-                                                       emg_tmp,
-                                                       mvc_list=self.mvc_list,
-                                                       norm_emg=self.norm_emg
-                                                       )
+                raw_emg, emg_proc = emg_process_method(
+                    raw_emg, emg_proc, emg_tmp, mvc_list=self.mvc_list, norm_emg=self.norm_emg
+                )
                 self.emg_queue_out.put({"raw_emg": raw_emg, "emg_proc": emg_proc})
                 self.event_emg.set()
 
@@ -375,15 +378,16 @@ class LiveData:
             else:
                 is_frame = True
             absolute_time_frame = datetime.datetime.now()
-            absolute_time_frame_dic = {"day": absolute_time_frame.day,
-                                       "hour": absolute_time_frame.hour,
-                                       "hour_s": absolute_time_frame.hour * 3600,
-                                       "minute": absolute_time_frame.minute,
-                                       "minute_s": absolute_time_frame.minute * 60,
-                                       "second": absolute_time_frame.second,
-                                       "millisecond": int(absolute_time_frame.microsecond / 1000),
-                                       "millisecond_s": int(absolute_time_frame.microsecond / 1000) * 0.001,
-                                       }
+            absolute_time_frame_dic = {
+                "day": absolute_time_frame.day,
+                "hour": absolute_time_frame.hour,
+                "hour_s": absolute_time_frame.hour * 3600,
+                "minute": absolute_time_frame.minute,
+                "minute_s": absolute_time_frame.minute * 60,
+                "second": absolute_time_frame.second,
+                "millisecond": int(absolute_time_frame.microsecond / 1000),
+                "millisecond_s": int(absolute_time_frame.microsecond / 1000) * 0.001,
+            }
 
             if is_frame:
                 if self.iter == 0:
@@ -396,7 +400,7 @@ class LiveData:
                             if device.type == "emg":
                                 emg_tmp = all_device_data[i][:10, :]
                     else:
-                        emg_tmp = self.emg_exp[: self.nb_electrodes, c: c + self.emg_sample]
+                        emg_tmp = self.emg_exp[: self.nb_electrodes, c : c + self.emg_sample]
                         c = c + self.emg_sample
                         # c = c + self.emg_sample if c + self.emg_sample < self.last_frame else self.init_frame
                     self.emg_queue_in.put_nowait({"raw_emg": raw_emg, "emg_proc": emg_proc, "emg_tmp": emg_tmp})
@@ -462,7 +466,7 @@ class LiveData:
                     }
                     if self.stream_emg:
                         data_to_save["emg_proc"] = emg_proc[:, -1:]
-                        data_to_save["raw_emg"] = raw_emg[:, -self.emg_sample:]
+                        data_to_save["raw_emg"] = raw_emg[:, -self.emg_sample :]
 
                     if self.stream_markers:
                         data_to_save["markers"] = markers[:3, :, -1:]
@@ -474,18 +478,20 @@ class LiveData:
                 self.iter += 1
             print(time() - tic)
             if not self.try_w_connection:
-                sleep(1/self.acquisition_rate)
+                sleep(1 / self.acquisition_rate)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     server_ip = "127.0.0.1"
     server_ports = [50000]
-    live_stream = LiveData(server_ip=server_ip,
-                           server_ports=server_ports,
-                           stream_from="vicon",
-                           device_host_ip="127.0.0.1",
-                           acquisition_rate=100,
-                           stream_rate=100,)
+    live_stream = LiveData(
+        server_ip=server_ip,
+        server_ports=server_ports,
+        stream_from="vicon",
+        device_host_ip="127.0.0.1",
+        acquisition_rate=100,
+        stream_rate=100,
+    )
     # mvc_list = [0.00053701,
     #             0.00046841,
     #             0.00038598,
@@ -497,8 +503,18 @@ if __name__ == '__main__':
     #             0.00035016,
     #             0.00035016,
     #             ]
-    mvc_list = [0.00059407, 0.00048661, 0.00043323, 0.00102025, 0.0012863,  0.00117913,
-     0.00115778, 0.00371461, 0.00042165, 0.00028015]
+    mvc_list = [
+        0.00059407,
+        0.00048661,
+        0.00043323,
+        0.00102025,
+        0.0012863,
+        0.00117913,
+        0.00115778,
+        0.00371461,
+        0.00042165,
+        0.00028015,
+    ]
     # mvc = sio.loadmat(f"data_final_new/subject_3/MVC_subject_3.mat")
     # #["MVC_list_max"][0]
     # mvc_list = [
@@ -513,26 +529,26 @@ if __name__ == '__main__':
     #     mvc[8],  # MVC Trapezius inferior
     #     mvc[9],  # MVC Latissimus dorsi
     # ]
-    live_stream.add_emg_device(electrode_idx=(0, 9),
-                               device_name="EMG",
-                               process=True,
-                               norm=True,
-                               mvc=mvc_list,
-                               rate=2000)
+    live_stream.add_emg_device(
+        electrode_idx=(0, 9), device_name="EMG", process=True, norm=True, mvc=mvc_list, rate=2000
+    )
     emg_processing = RealTimeProcessing()
     emg_processing.ma_win = 600
     live_stream.interface.devices[-1].set_process_method(emg_processing.process_emg)
 
-    live_stream.add_markers(nb_markers=16,
-                            subject="subject_3",
-                            smooth_traj=True,
-                            rate=100,
-                            unlabeled=False,
-                            compute_kin=True,
-                            msk_model="data_final_new/subject_3/wu_scaled.bioMod"
-                            )
+    live_stream.add_markers(
+        nb_markers=16,
+        subject="subject_3",
+        smooth_traj=True,
+        rate=100,
+        unlabeled=False,
+        compute_kin=True,
+        msk_model="data_final_new/subject_3/wu_scaled.bioMod",
+    )
 
-    live_stream.run(test_with_connection=False,
-                    show_log=True,
-                    output_file_path="data_final_new/subject_3/C3D/data_flex_sans_poid",
-                    offline_file_path="data_final_new/subject_3/C3D/flex_sans_poid")
+    live_stream.run(
+        test_with_connection=False,
+        show_log=True,
+        output_file_path="data_final_new/subject_3/C3D/data_flex_sans_poid",
+        offline_file_path="data_final_new/subject_3/C3D/flex_sans_poid",
+    )

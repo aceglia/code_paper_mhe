@@ -13,21 +13,23 @@ try:
     import opensim
 except ModuleNotFoundError:
     pass
+
 import C3DtoTRC
 import csv
 from biosiglive.processing.msk_functions import kalman_func
-from biosiglive.io.save_data import read_data, add_data_to_pickle
+from biosiglive.io.save_data import read_data
+from osim_to_biomod import Converter
 
 
 def read_sto_mot_file(filename):
     """
-        Read sto or mot file from Opensim
-        ----------
-        filename: path
-            Path of the file witch have to be read
-        Returns
-        -------
-        Data Dictionary with file informations
+    Read sto or mot file from Opensim
+    ----------
+    filename: path
+        Path of the file witch have to be read
+    Returns
+    -------
+    Data Dictionary with file informations
     """
     data = {}
     data_row = []
@@ -57,7 +59,14 @@ def read_sto_mot_file(filename):
     return data
 
 
-def initialize(model_path: str, data_dir: str, scaling: bool = False, off_line: bool = True, mass: float = None):
+def initialize(
+    osim_model: str = None,
+    biomod_model: str = None,
+    data_dir: str = "data",
+    scaling: bool = False,
+    mass: float = None,
+    trial: str = None,
+):
     """
     Initialize the model with a Kalman filter and/or scale it.
 
@@ -74,7 +83,7 @@ def initialize(model_path: str, data_dir: str, scaling: bool = False, off_line: 
     mass : int, optional
         Mass of the subject. The default is None.
     """
-    mat = read_data(f"{data_dir}/C3D/{trial}")
+    mat = read_data(f"{data_dir}/{trial}")
     markers = mat["markers"][:3, :, :50]
 
     # Define the name of the model's markers
@@ -97,14 +106,11 @@ def initialize(model_path: str, data_dir: str, scaling: bool = False, off_line: 
         "STYLu",
     ]
 
-    # markers_tmp = np.copy(markers)
-    # markers[:, 13, :] = markers_tmp[:, 14, :]
-    # markers[:, 14, :] = markers_tmp[:, 15, :]
-    # markers[:, 15, :] = markers_tmp[:, 13, :]
-
     if scaling:
+        model_path = osim_model
         # ---------- model scaling ------------ #
         from pathlib import Path
+
         osim_model_path = model_path
         model_output = f"{data_dir}/" + Path(osim_model_path).stem + f"_scaled.osim"
         scaling_tool = f"{data_dir}/scaling_tool.xml"
@@ -143,13 +149,14 @@ def initialize(model_path: str, data_dir: str, scaling: bool = False, off_line: 
         )
 
     else:
+        model_path = biomod_model
         bmodel = biorbd.Model(model_path)
         q_recons, _ = kalman_func(markers, model=bmodel, use_kalman=True)
         q_mean = q_recons.mean(axis=1)
-        print(q_mean[3], q_mean[4], q_mean[5]," xyz " , q_mean[0], q_mean[1], q_mean[2])
+        print(q_mean[3], q_mean[4], q_mean[5], " xyz ", q_mean[0], q_mean[1], q_mean[2])
         b = bioviz.Viz(model_path=model_path)
-        b.load_movement(q_recons) # Q from kalman array(nq, nframes)
-        b.load_experimental_markers(markers) # expr markers array(3, nmarkers, nframes)
+        b.load_movement(q_recons)  # Q from kalman array(nq, nframes)
+        b.load_experimental_markers(markers)  # experimental markers array(3, nmarkers, nframes)
         b.exec()
 
 
@@ -168,117 +175,22 @@ def convert_model(in_path: str, out_path: str, viz: bool = None):
 
     """
     #  convert_model
-    from OsimToBiomod import Converter
-
-    converter = Converter(out_path, in_path, muscle_type="Thelen2003Muscle")
-    converter.main()
+    converter = Converter(
+        out_path, in_path, ignore_clamped_dof_tag=True, ignore_muscle_applied_tag=True, print_warnings=False
+    )
+    converter.convert_file()
     if viz:
         b = bioviz.Viz(model_path=out_path)
         b.exec()
 
 
 if __name__ == "__main__":
-    trial = ["data_abd_sans_poid"]
-        # "data_abd_poid_2kg",
-        # "data_flex_sans_poid",
-
-        #      "data_cycl_poid_2kg",
-        #      "data_cycl_sans_poid",
-        # "data_flex_poid_2k",
-
-
-    # trial = trial[0]
-    model_path = "data_final_new/subject_3/C3D/wu_scaled.bioMod"
-    model = biorbd.Model(model_path)
-    # for i in trial:
-        # results_mat_abd = read_data(f"data_final_new/subject_3/{i}")
-        # # results_mat_flex = read_data(f"data_final_new/subject_3/{trial}")
-        # # convert_model(f"data_final_new/subject_3/wu_scaled.osim", f"data_final_new/subject_3/wu_scaled.bioMod", viz=True)
-        # # model_path = f"{data_dir}/wu.osim"
-        # # # model = biorbd.Model(model_path)
-        #
-        # q_recons, q_dot = kalman_func(results_mat_abd["markers"][:, :, 1000:], return_q_dot=True, model=model, use_kalman=True)
-        # import numpy as np
-        #
-        # # def finite_difference(data, f):
-        # #     t = np.linspace(0, data.shape[0] / f, data.shape[0])
-        # #     y = data
-        # #     dydt = np.gradient(y, t)
-        # #     return dydt
-        # import matplotlib.pyplot as plt
-        # for s in range(len(trial)):
-        #     plt.figure("markers")
-        #     for i in range(model.nbMarkers()):
-        #         plt.subplot(4, 4, i + 1)
-        #         plt.plot(results_mat_abd["markers"][0, i, 1000:].T, "-r")
-        #         plt.plot(results_mat_abd["markers"][1, i, 1000:].T, "-r")
-        #         plt.plot(results_mat_abd["markers"][2, i, 1000:].T, "-r")
-        # plt.show()
-        # b = bioviz.Viz(model_path=model_path)
-        # b.load_movement(q_recons)
-        # b.load_experimental_markers(results_mat_abd["markers"][:, :, 1000:])
-        # b.exec()
-        # # q_dot = np.copy(q_recons)
-        # # for j in range(q_recons.shape[0]):
-        # #     q_dot[j, :] = finite_difference(q_recons[j, :], 100)
-        # results_mat_abd["emg_proc"] = results_mat_abd["emg_proc"][:, 1000:]
-        # results_mat_abd["markers"] = results_mat_abd["markers"][:, :, 1000:]
-        # results_mat_abd["kalman"] = np.concatenate((q_recons, q_dot), axis=0)
-        # add_data_to_pickle(results_mat_abd, f"{i}_test")
-
-
-    # import matplotlib.pyplot as plt
-    # for s in range(len(trial)):
-    #     plt.figure("markers")
-    #     for i in range(model.nbMarkers()):
-    #         plt.subplot(4, 4, i + 1)
-    #         plt.plot(results_mat_abd["markers"][0, i, :].T, "-r")
-    #         plt.plot(results_mat_abd["markers"][1, i, :].T, ".-r")
-    #         plt.plot(results_mat_abd["markers"][2, i, :].T, "--r")
-    #         plt.plot(results_mat_flex["markers"][0, i, :].T, "-b")
-    #         plt.plot(results_mat_flex["markers"][1, i, :].T, ".-b")
-    #         plt.plot(results_mat_flex["markers"][2, i, :].T, "--b")
-    # plt.show()
-    subject = "subject_3"
+    trial = "data_abd_sans_poid"
+    bio_model = "data/wu_scaled.bioMod"
     mass = 72
     mass_scaling = mass * 0.578 + mass * 0.050
-    data_dir = f"data_final_new/{subject}"
-    model_path = f"{data_dir}/C3D/wu_scaled.bioMod"
-    # convert_model(f"{data_dir}/wu_scaled_markers.osim", f"{data_dir}/wu_scaled_markers.bioMod", viz=True)
-    # model_path = f"{data_dir}/wu.osim"
-    trial = trial[0]
-    # model = biorbd.Model(model_path)
-    # for i, muscle in enumerate(model.muscleNames()):
-    #     print(f"idx: {i} - name: {muscle.to_string()}")
-    initialize(model_path, data_dir, scaling=False, off_line=True, mass=mass_scaling)
-
-    # Write file
-    # data_path = f"{data_dir}/{trial}"
-    # data_path_saved = f"{data_dir}/{trial}_w_dq_scaled"
-    # data = read_data(data_path)
-    # bmodel = biorbd.Model(model_path)
-    # # b = bioviz.Viz(model_path=model_path)
-    # # b.exec()
-    # markers = data["markers"]
-    # markers_tmp = np.copy(markers)
-    # markers[:, 13, :] = markers_tmp[:, 14, :]
-    # markers[:, 14, :] = markers_tmp[:, 15, :]
-    # markers[:, 15, :] = markers_tmp[:, 13, :]
-    # q_recons, q_dot_recons = kalman_func(markers, model=bmodel, return_q_dot=True, return_kalman=False)
-    # # b = bioviz.Viz(model_path=model_path)
-    # # b.load_movement(q_recons)
-    # # b.load_experimental_markers(markers)
-    # # b.exec()
-    # x_kalman = np.concatenate((q_recons, q_dot_recons), axis=0)
-    # import matplotlib.pyplot as plt
-    # plt.figure("q")
-    # for i in range(9):
-    #     plt.subplot(3, 3, i + 1)
-    #     plt.plot(x_kalman[i, :], label="kalman")
-    # plt.figure("qdot")
-    # for i in range(9, 18):
-    #     plt.subplot(3, 3, i - 9 + 1)
-    #     plt.plot(x_kalman[i, :], label="kalman")
-    # # plt.show()
-    # add_data_to_pickle({"kalman": x_kalman, "markers": data["markers"], "emg": data["emg"]}, data_path_saved)
-    # # plot kalman
+    data_dir = f"data"
+    osim_model = f"{data_dir}/wu.osim"
+    initialize(
+        osim_model=osim_model, biomod_model=bio_model, data_dir=data_dir, scaling=False, mass=mass_scaling, trial=trial
+    )

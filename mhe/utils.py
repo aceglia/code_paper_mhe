@@ -49,31 +49,22 @@ def update_plot(estimator_instance, force_est: np.ndarray, q_est: np.ndarray, in
     absolute_delay_plot = 0
     if estimator_instance.data_to_show.count("force") != 0:
         estimator_instance.force_to_plot = np.append(
-            estimator_instance.force_to_plot[:, -estimator_instance.exp_freq - 1:], force_est, axis=1
+            estimator_instance.force_to_plot[:, -estimator_instance.exp_freq - 1 :], force_est, axis=1
         )
-        # LivePlot.update_plot_force(
-        #     estimator_instance.force_to_plot,
-        #     estimator_instance.p_force,
-        #     estimator_instance.app_force,
-        #     estimator_instance.plot_force_ratio,
-        #     muscle_names=estimator_instance.muscle_names,
-        # )
         estimator_instance.all_plot.update_plot_window(
             estimator_instance.all_plot.plot[0],
             data=estimator_instance.force_to_plot,
             app=estimator_instance.app_force,
             rplt=estimator_instance.rplt_force,
-            box=estimator_instance.layout_force
+            box=estimator_instance.layout_force,
         )
 
         estimator_instance.count_p_f = 0
         estimator_instance.count_p_f += 1
 
     if estimator_instance.data_to_show.count("q") != 0:
-        # estimator_instance.b.set_q(np.array(q_est)[:, -1])
         n_plot = 0 if not "force" in estimator_instance.data_to_show else 1
-        estimator_instance.all_plot.update_plot_window(estimator_instance.all_plot.plot[n_plot],
-                                                       np.array(q_est)[:, -1])
+        estimator_instance.all_plot.update_plot_window(estimator_instance.all_plot.plot[n_plot], np.array(q_est)[:, -1])
 
     if init_time:
         absolute_time_received = datetime.datetime.now()
@@ -96,13 +87,9 @@ def update_plot(estimator_instance, force_est: np.ndarray, q_est: np.ndarray, in
     return np.round(absolute_delay_plot, 3)
 
 
-def compute_force(sol: bioptim.Solution,
-                  get_force,
-                  nbmt: int,
-                  use_excitation: bool = False,
-                  frame_to_save: int = 0,
-                  slide_size=1
-                  ):
+def compute_force(
+    sol: bioptim.Solution, get_force, nbmt: int, frame_to_save: int = 0, slide_size=1, save_all_frame=False
+):
     """
     Compute the force.
 
@@ -122,30 +109,23 @@ def compute_force(sol: bioptim.Solution,
     Tuple of the force, joint angles, activation and excitation.
     """
     if frame_to_save >= sol.states["q"].shape[1] - 1 + slide_size:
-        raise RuntimeError(f"You can ask to save frame from 0 to {sol.states['q'].shape[1] + slide_size}."
-                           f"You asked{frame_to_save}.")
-    # force_est = np.zeros((nbmt, slide_size))
-    # q_est = sol.states["q"][:, frame_to_save:frame_to_save + slide_size]
-    # dq_est = sol.states["qdot"][:, frame_to_save:frame_to_save + slide_size]
-    # if use_excitation:
-    #     a_est = sol.states["muscles"][:, frame_to_save:frame_to_save + slide_size]
-    #     u_est = sol.controls["muscles"][:, frame_to_save:frame_to_save + slide_size]
-    # else:
-    #     a_est = sol.controls["muscles"][:, frame_to_save:frame_to_save + slide_size]
-    #     u_est = a_est
-    q_est = sol.states["q"]
-    dq_est = sol.states["qdot"]
-    if use_excitation:
-        a_est = sol.states["muscles"]
-        u_est = sol.controls["muscles"]
+        raise RuntimeError(
+            f"You can ask to save frame from 0 to {sol.states['q'].shape[1] + slide_size}." f"You asked{frame_to_save}."
+        )
+    force_est = np.zeros((nbmt, slide_size))
+    if not save_all_frame:
+        q_est = sol.states["q"][:, frame_to_save : frame_to_save + slide_size]
+        dq_est = sol.states["qdot"][:, frame_to_save : frame_to_save + slide_size]
+        a_est = sol.controls["muscles"][:, frame_to_save : frame_to_save + slide_size]
     else:
+        q_est = sol.states["q"]
+        dq_est = sol.states["qdot"]
         a_est = sol.controls["muscles"]
-        u_est = a_est
-
-    # for i in range(nbmt):
-    #     for j in range(slide_size):
-    #         force_est[i, j] = get_force(q_est[:, j], dq_est[:, j], a_est[:, j], u_est[:, j])[i, :]
-    return q_est, dq_est, a_est, u_est
+    u_est = a_est
+    for i in range(nbmt):
+        for j in range(slide_size):
+            force_est[i, j] = get_force(q_est[:, j], dq_est[:, j], a_est[:, j], u_est[:, j])[i, :]
+    return q_est, dq_est, a_est, u_est, force_est
 
 
 def save_results(
@@ -271,13 +251,9 @@ def interpolate_data(interp_factor: int, x_ref: np.ndarray, muscles_target: np.n
     return x_ref, markers_ref, muscles_target
 
 
-def get_data(ip=None,
-             port=None,
-             message=None,
-             offline=False,
-             offline_file_path=None):
+def get_data(ip=None, port=None, message=None, offline=False, offline_file_path=None):
     if offline:
-        nfinal = -100
+        nfinal = -400
         if offline_file_path[-4:] == ".mat":
             mat = sio.loadmat(offline_file_path)
             x_ref, markers, muscles = mat["kalman"], mat["markers"], mat["emg_proc"]
@@ -287,9 +263,11 @@ def get_data(ip=None,
             try:
                 x_ref, markers, muscles = mat["kalman"], mat["kin_target"], mat["muscles_target"]
             except:
-                x_ref, markers, muscles = mat["kalman"][:, :nfinal],\
-                                          mat["markers"][:, :, :nfinal],\
-                                          mat["emg_proc"][:, :nfinal]
+                x_ref, markers, muscles = (
+                    mat["kalman"][:, 100:nfinal],
+                    mat["markers"][:, 4:, 100:nfinal],
+                    mat["emg_proc"][:, 100:nfinal],
+                )
         return x_ref, markers, muscles
     else:
         client = Client(ip, port, "TCP")

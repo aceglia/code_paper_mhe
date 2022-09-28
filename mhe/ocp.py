@@ -98,15 +98,15 @@ def force_func(biorbd_model: biorbd.Model, use_excitation: bool = False):
         ["Force"],
     ).expand()
 
+
 def define_objective(
     weights: dict,
     use_torque: bool,
-    use_excitation: bool,
     track_emg: bool,
     muscles_target: np.ndarray,
     kin_target: np.ndarray,
     biorbd_model: biorbd.Model,
-    previous_sol,
+    previous_sol: np.ndarray,
     kin_data_to_track: str = "markers",
     muscle_track_idx: list = (),
 ):
@@ -125,6 +125,8 @@ def define_objective(
         Target of the muscles.
     kin_target : np.ndarray
         Target for kinematics objective.
+    previous_sol : np.ndarray
+        solution of the previous subproblem
     biorbd_model : biorbd.Model
         Model of the system.
     kin_data_to_track : str
@@ -136,7 +138,10 @@ def define_objective(
     -------
     Objective function.
     """
-    previous_q, previous_qdot = previous_sol[:biorbd_model.nbQ(), :], previous_sol[biorbd_model.nbQ():biorbd_model.nbQ() * 2, :]
+    previous_q, previous_qdot = (
+        previous_sol[: biorbd_model.nbQ(), :],
+        previous_sol[biorbd_model.nbQ() : biorbd_model.nbQ() * 2, :],
+    )
     muscle_min_idx = []
     for i in range(biorbd_model.nbMuscles()):
         if i not in muscle_track_idx:
@@ -155,14 +160,16 @@ def define_objective(
         objectives.add(
             ObjectiveFcn.Lagrange.MINIMIZE_CONTROL,
             weight=1000,
+            # tmhe = 0.09 :
+            # weight=10000000,
             index=muscle_track_idx,
             key="muscles",
             multi_thread=False,
         )
 
     objectives.add(
-            ObjectiveFcn.Lagrange.MINIMIZE_CONTROL, weight=weights["min_control"], key="muscles", multi_thread=False
-        )
+        ObjectiveFcn.Lagrange.MINIMIZE_CONTROL, weight=weights["min_control"], key="muscles", multi_thread=False
+    )
 
     if use_torque:
         objectives.add(
@@ -176,17 +183,8 @@ def define_objective(
             weight=kin_weight,
             target=kin_target,
             node=Node.ALL,
-            #index=range(4, 16),
             multi_thread=False,
         )
-        #objectives.add(
-        #    kin_funct,
-        #    weight=kin_weight/10000,
-        #    target=kin_target[:, :4, :],
-        #    node=Node.ALL,
-        #    index=range(0, 4),
-        #    multi_thread=False,
-        #)
 
     elif kin_data_to_track == "q":
         objectives.add(kin_funct, weight=kin_weight, target=kin_target, key="q", node=Node.ALL, multi_thread=False)
@@ -198,7 +196,6 @@ def define_objective(
         key="qdot",
         node=Node.ALL,
         multi_thread=False,
-        # derivative=True
     )
 
     objectives.add(
@@ -208,29 +205,31 @@ def define_objective(
         key="qdot",
         node=Node.ALL,
         multi_thread=False,
-        # derivative=True
     )
-    objectives.add(ObjectiveFcn.Lagrange.TRACK_STATE, weight=100000000, target=previous_q[:, :], key="q",
-                   node=Node.ALL, multi_thread=False)
-    objectives.add(ObjectiveFcn.Lagrange.TRACK_STATE, weight=100000, target=previous_qdot[:, :], key="qdot",
-                   node=Node.ALL, multi_thread=False)
-    if use_excitation:
-        objectives.add(
-            ObjectiveFcn.Lagrange.MINIMIZE_STATE,
-            weight=weights["min_activation"],
-            key="muscles",
-            node=Node.ALL,
-            multi_thread=False,
-            # derivative=True
-        )
+    objectives.add(
+        ObjectiveFcn.Lagrange.TRACK_STATE,
+        weight=100000000,
+        target=previous_q[:, :],
+        key="q",
+        node=Node.ALL,
+        multi_thread=False,
+    )
+    objectives.add(
+        ObjectiveFcn.Lagrange.TRACK_STATE,
+        weight=100000,
+        target=previous_qdot[:, :],
+        key="qdot",
+        node=Node.ALL,
+        multi_thread=False,
+    )
     return objectives
 
 
 def custom_muscles_driven(
-        states: MX.sym,
-        controls: MX.sym,
-        parameters: MX.sym,
-        nlp,
+    states: MX.sym,
+    controls: MX.sym,
+    parameters: MX.sym,
+    nlp,
 ):
     """
     Forward dynamics driven by muscle.
@@ -261,8 +260,6 @@ def custom_muscles_driven(
         if i > 4 and i != nlp.model.nbQ() - 1:
             residual_tau[i] = MX(0)
 
-
-
     tau = muscles_tau + residual_tau if residual_tau is not None else muscles_tau
     dq = DynamicsFunctions.compute_qdot(nlp, q, qdot)
     ddq = DynamicsFunctions.forward_dynamics(nlp, q, qdot, tau, False)
@@ -281,7 +278,6 @@ def prepare_problem(
     x0: np.ndarray,
     u0: np.ndarray = None,
     use_torque: bool = False,
-    use_excitation: bool=False,
     nb_threads: int = 8,
     solver_options: dict = None,
     use_acados: bool = False,
@@ -323,15 +319,13 @@ def prepare_problem(
 
     # Dynamics
     dynamics = DynamicsList()
-    dynamics.add(DynamicsFcn.MUSCLE_DRIVEN,
-                 dynamic_function=custom_muscles_driven,
-                 with_excitations=use_excitation,
-                 with_torque=use_torque,
-                 expand=False
-                 )
-    #
-    # dynamics.add(DynamicsFcn.MUSCLE_DRIVEN,  with_excitations=use_excitation, with_torque=use_torque, expand=False)
-
+    dynamics.add(
+        DynamicsFcn.MUSCLE_DRIVEN,
+        dynamic_function=custom_muscles_driven,
+        with_excitations=False,
+        with_torque=use_torque,
+        expand=False,
+    )
     if x0.shape[0] != biorbd_model.nbQ() * 2:
         x_0 = np.concatenate((x0[:, : window_len + 1], np.zeros((x0.shape[0], window_len + 1))))
     else:
@@ -340,27 +334,29 @@ def prepare_problem(
     # State path constraint
     x_bounds = BoundsList()
     x_bounds.add(bounds=QAndQDotBounds(biorbd_model))
-    if use_excitation:
-        x_bounds[0].concatenate(Bounds([0] * biorbd_model.nbMuscles(), [1] * biorbd_model.nbMuscles()))
+    x_bounds[0].min[: biorbd_model.nbQ(), 0] = [i - 0.1 * i for i in x_0[: biorbd_model.nbQ(), 0]]
+    x_bounds[0].max[: biorbd_model.nbQ(), 0] = [i + 0.1 * i for i in x_0[: biorbd_model.nbQ(), 0]]
+    x_bounds[0].min[biorbd_model.nbQ() : biorbd_model.nbQ() * 2, 0] = [
+        i - 0.1 * i for i in x_0[biorbd_model.nbQ() :, 0]
+    ]
+    x_bounds[0].max[biorbd_model.nbQ() : biorbd_model.nbQ() * 2, 0] = [
+        i + 0.1 * i for i in x_0[biorbd_model.nbQ() :, 0]
+    ]
+    x_bounds[0].min[biorbd_model.nbQ() : biorbd_model.nbQ() * 2, [1, -1]] = [[-5] * 2] * biorbd_model.nbQ()
+    x_bounds[0].max[biorbd_model.nbQ() : biorbd_model.nbQ() * 2, [1, -1]] = [[5] * 2] * biorbd_model.nbQ()
 
-    x_bounds[0].min[:biorbd_model.nbQ(), 0] = [i - 0.1 * i for i in x_0[:biorbd_model.nbQ(), 0]]
-    x_bounds[0].max[:biorbd_model.nbQ(), 0] = [i + 0.1 * i for i in x_0[:biorbd_model.nbQ(), 0]]
-    x_bounds[0].min[biorbd_model.nbQ():biorbd_model.nbQ() * 2, 0] = [i - 0.1 * i for i in x_0[biorbd_model.nbQ():, 0]]
-    x_bounds[0].max[biorbd_model.nbQ():biorbd_model.nbQ() * 2, 0] = [i + 0.1 * i for i in x_0[biorbd_model.nbQ():, 0]]
-    x_bounds[0].min[biorbd_model.nbQ():biorbd_model.nbQ() * 2, [1, -1]] = [[-5] * 2] * biorbd_model.nbQ()
-    x_bounds[0].max[biorbd_model.nbQ():biorbd_model.nbQ() * 2, [1, -1]] = [[5] * 2] * biorbd_model.nbQ()
-
-    u_bounds = Bounds([tau_min] * nbGT + [muscle_min] * biorbd_model.nbMuscleTotal(),
+    u_bounds = Bounds(
+        [tau_min] * nbGT + [muscle_min] * biorbd_model.nbMuscleTotal(),
         [tau_max] * nbGT + [muscle_max] * biorbd_model.nbMuscleTotal(),
-                      interpolation=InterpolationType.CONSTANT_WITH_FIRST_AND_LAST_DIFFERENT)
+        interpolation=InterpolationType.CONSTANT_WITH_FIRST_AND_LAST_DIFFERENT,
+    )
 
     # Initial guesses
     if x0.shape[0] != biorbd_model.nbQ() * 2:
         x0 = np.concatenate((x0[:, : window_len + 1], np.zeros((x0.shape[0], window_len + 1))))
     else:
         x0 = x0[:, : window_len + 1]
-    if use_excitation:
-        x0 = np.concatenate((x0[:, : window_len + 1], np.ones((biorbd_model.nbMuscles(), window_len + 1)) * 0.2))
+
     x_init = InitialGuess(x0, interpolation=InterpolationType.EACH_FRAME)
 
     if u0 is None:
@@ -382,26 +378,13 @@ def prepare_problem(
         n_threads=nb_threads,
         use_sx=use_acados,
     )
-    if not use_acados:
-        solver = Solver.IPOPT()
-        solver.set_linear_solver("ma57")
-        solver.set_print_level(5)
-        # solver.set_hessian_approximation("limited-memory")
-        solver.set_hessian_approximation("exact")
-        solver.set_maximum_iterations(50)
-
-    else:
-        solver = Solver.ACADOS()
-        # solver.set_convergence_tolerance([1e-5, 1e-5, 1e-5, 1e-5])
-        solver.set_integrator_type("IRK")
-        solver.set_qp_solver("PARTIAL_CONDENSING_OSQP")#PARTIAL_CONDENSING_HPIPMPARTIAL_CONDENSING_OSQPFULL_CONDENSING_QPOASES
-        solver.set_nlp_solver_type("SQP_RTI")
-        solver.set_print_level(0)
-        for key in solver_options.keys():
-            solver.set_option_unsafe(val=solver_options[key], name=key)
-        # solver.set_sim_method_num_steps(1)
-        # solver.set_sim_method_num_stages(2)
-
+    solver = Solver.ACADOS()
+    solver.set_integrator_type("IRK")
+    solver.set_qp_solver("PARTIAL_CONDENSING_OSQP")
+    solver.set_nlp_solver_type("SQP_RTI")
+    solver.set_print_level(0)
+    for key in solver_options.keys():
+        solver.set_option_unsafe(val=solver_options[key], name=key)
     return problem, solver
 
 
@@ -414,29 +397,6 @@ def configure_weights():
     weights : dict
         Dictionary of weights
     """
-    # # with HPIPM:
-    # weights = {
-    #     "track_markers": 1000000000,
-    #     "track_q": 100000000000000,
-    #     "min_control": 100,
-    #     "min_dq": 1,
-    #     "min_q": 1,
-    #     "min_torque": 10000,
-    #     "track_emg": 1000000,
-    #     "min_activation": 10,
-    # }
-    # OSQP
-    # weights = {
-    #     "track_markers": 1000000000000,
-    #     "track_q": 100000000000000,
-    #     "min_control": 10000000,
-    #     "min_dq": 1000000,
-    #     "min_q": 100,
-    #     "min_torque": 1000000,
-    #     "track_emg": 100000000,
-    #     "min_activation": 10,
-    # }
-    # avec poids
     weights = {
         "track_markers": 10000000000000000,
         "track_q": 100000000000000,
@@ -446,36 +406,18 @@ def configure_weights():
         "min_torque": 1000,
         "track_emg": 1000000000,
         "min_activation": 10,
-
     }
+    # tmhe 0.09
     # weights = {
-    #     "track_markers": 10000,
-    #     # "track_q": 100,
-    #     "min_control": 10,
-    #     "min_dq": 0.0001,
-    #     "min_q": 0.000001,
-    #     "min_torque": 100,
-    #     "track_emg": 1000,
-    #     # "min_activation": 10,
-    # }
-    # weights = {
-    #     "track_markers": 1000000000000000000,
+    #     "track_markers": 1000000000000000,
     #     "track_q": 100000000000000,
-    #     "min_control": 1000000,
-    #     "min_dq": 10,
+    #     "min_control": 100000000000,
+    #     "min_dq": 10000000,
     #     "min_q": 1,
-    #     "min_torque": 1000000,
+    #     "min_torque": 1000,
     #     "track_emg": 10000000000000,
     #     "min_activation": 10,
-    # }
-    # with Ipopt:
-    # weights = {
-    #     "track_markers": 10000,
-    #     "min_control": 1,
-    #     "min_dq": 0.01,
-    #     "min_q": 0.01,
-    #     "track_emg": 100,
-    #     "track_q": 100000,
+    #
     # }
     return weights
 
@@ -545,8 +487,8 @@ def get_target(
 
     if sol:
         previous_sol = np.concatenate(
-            (sol.states["all"][:, slide_size:], np.repeat(sol.states["all"][:, -1][:, np.newaxis],
-                                                               slide_size, axis=1)), axis=1
+            (sol.states["all"][:, slide_size:], np.repeat(sol.states["all"][:, -1][:, np.newaxis], slide_size, axis=1)),
+            axis=1,
         )
     else:
         previous_sol = np.concatenate((x_ref[:, : ns_mhe + 1], np.zeros((x_ref.shape[0], ns_mhe + 1))))
@@ -555,9 +497,11 @@ def get_target(
         kin_target = x_ref[:nbQ, slide_size * t : (ns_mhe + 1 + slide_size * t)] if offline else x_ref
     else:
         kin_target = markers_ref[:3, :, slide_size * t : (ns_mhe + 1 + slide_size * t)]
-    target = {"kin_target": [kin_target_idx[0], kin_target], "previous_q": [q_target_idx[0], previous_sol[:nbQ, :]],
-              "previous_q_dot": [q_target_idx[1], previous_sol[nbQ:nbQ*2, :]]
-              }
+    target = {
+        "kin_target": [kin_target_idx[0], kin_target],
+        "previous_q": [q_target_idx[0], previous_sol[:nbQ, :]],
+        "previous_q_dot": [q_target_idx[1], previous_sol[nbQ : nbQ * 2, :]],
+    }
     if track_emg:
         target["muscle_target"] = [muscles_target_idx[0], muscle_target]
     return target
@@ -619,10 +563,9 @@ def update_mhe(mhe, t: int, sol: bioptim.Solution, estimator_instance, initial_t
             if key == "second" or key[-1:] == "s":
                 absolute_time_received_s = absolute_time_received_s + absolute_time_received_dic[key]
     else:
-        data = get_data(ip=estimator_instance.server_ip,
-                        port=estimator_instance.server_port,
-                        message=estimator_instance.message
-                        )
+        data = get_data(
+            ip=estimator_instance.server_ip, port=estimator_instance.server_port, message=estimator_instance.message
+        )
         x_ref = np.array(data["kalman"])
         markers_target = np.array(data["markers"])
         muscles_target = np.array(data["emg_proc"])
@@ -669,7 +612,7 @@ def update_mhe(mhe, t: int, sol: bioptim.Solution, estimator_instance, initial_t
         kin_data_to_track=estimator_instance.kin_data_to_track,
         model=estimator_instance.model,
         offline=estimator_instance.test_offline,
-        sol=sol
+        sol=sol,
     )
     mhe.slide_size = estimator_instance.slide_size
     if estimator_instance.test_offline:
@@ -705,17 +648,18 @@ def update_mhe(mhe, t: int, sol: bioptim.Solution, estimator_instance, initial_t
     if t > 0:
         tmp_slide_size = estimator_instance.slide_size
         estimator_instance.slide_size = 1
-        q_est, dq_est, a_est, u_est = compute_force(
+        q_est, dq_est, a_est, u_est, force_est = compute_force(
             sol,
             estimator_instance.get_force,
             estimator_instance.nbMT,
             frame_to_save=estimator_instance.frame_to_save,
-            slide_size=estimator_instance.slide_size
+            slide_size=estimator_instance.slide_size,
+            save_all_frame=estimator_instance.save_all_frame,
         )
         if estimator_instance.data_to_show:
             dic_to_put = {
                 "t": t,
-                # "force_est": force_est.tolist(),
+                "force_est": force_est.tolist(),
                 "q_est": q_est.tolist(),
                 "init_time_frame": absolute_time_received_s,
             }
@@ -728,68 +672,96 @@ def update_mhe(mhe, t: int, sol: bioptim.Solution, estimator_instance, initial_t
         time_to_get_data = time() - tic
         time_to_solve = sol.real_time_to_optimize
         time_tot = time_to_solve + time_to_get_data
-
         if estimator_instance.save_results:
-            # if mhe.kalman is not None:
-            #     mhe.kalman = np.append(mhe.kalman, x_ref_to_save[:, estimator_instance.frame_to_save:estimator_instance.frame_to_save + estimator_instance.slide_size], axis=1)
-            # else:
-            #     mhe.kalman = x_ref_to_save[:, estimator_instance.frame_to_save:estimator_instance.frame_to_save + estimator_instance.slide_size]
-            #
-            # data_to_save = {
-            #     "time": time() - initial_time,
-            #     "X_est": np.concatenate((q_est, dq_est), axis=0),
-            #     "U_est": u_est,
-            #     "kalman": x_ref_to_save[:, estimator_instance.frame_to_save:estimator_instance.frame_to_save + estimator_instance.slide_size],
-            #     # "f_est": force_est,
-            #     "none_conv_iter": stat,
-            #     "solver_options": estimator_instance.solver_options,
-            # }
-            # if t == 1:
-            #     data_to_save["Nmhe"] = estimator_instance.ns_mhe
-            # data_to_save["muscles_target"] = muscles_target_to_save[:, estimator_instance.frame_to_save:estimator_instance.frame_to_save + estimator_instance.slide_size] if "muscle_target" in target.keys() else 0
-            # if estimator_instance.kin_data_to_track == "q":
-            #     kin_target = kin_target_to_save[:, estimator_instance.frame_to_save:estimator_instance.frame_to_save + estimator_instance.slide_size]
-            #
-            # else:
-            #     kin_target = kin_target_to_save[:, :, estimator_instance.frame_to_save:estimator_instance.frame_to_save + estimator_instance.slide_size]
-            #
-            # if estimator_instance.use_torque:
-            #     data_to_save["tau_est"] = sol.controls["tau"][:, estimator_instance.frame_to_save:estimator_instance.frame_to_save + estimator_instance.slide_size]
-            #
-            # data_to_save["kin_target"] = kin_target
-            # data_to_save["sol_freq"] = 1 / time_tot
-            # data_to_save["exp_freq"] = estimator_instance.exp_freq
-            # data_to_save["sleep_time"] = (1 / estimator_instance.exp_freq) - time_tot
-            # data_to_save["absolute_delay_tcp"] = absolute_delay_tcp
-            # data_to_save["absolute_time_receive"] = absolute_time_received_dic
-            # data_to_save["absolute_time_frame"] = absolute_time_frame
-            # if vicon_latency:
-            #     data_to_save["vicon_latency"] = vicon_latency
-            if mhe.kalman is not None:
-                mhe.kalman = np.append(mhe.kalman, x_ref_to_save, axis=1)
+            if not estimator_instance.save_all_frame:
+                if mhe.kalman is not None:
+                    mhe.kalman = np.append(
+                        mhe.kalman,
+                        x_ref_to_save[
+                            :,
+                            estimator_instance.frame_to_save : estimator_instance.frame_to_save
+                            + estimator_instance.slide_size,
+                        ],
+                        axis=1,
+                    )
+                else:
+                    mhe.kalman = x_ref_to_save[
+                        :,
+                        estimator_instance.frame_to_save : estimator_instance.frame_to_save
+                        + estimator_instance.slide_size,
+                    ]
+
+                data_to_save = {
+                    "time": time() - initial_time,
+                    "X_est": np.concatenate((q_est, dq_est), axis=0),
+                    "U_est": u_est,
+                    "kalman": x_ref_to_save[
+                        :,
+                        estimator_instance.frame_to_save : estimator_instance.frame_to_save
+                        + estimator_instance.slide_size,
+                    ],
+                    "f_est": force_est,
+                    "none_conv_iter": stat,
+                    "solver_options": estimator_instance.solver_options,
+                }
+                if t == 1:
+                    data_to_save["Nmhe"] = estimator_instance.ns_mhe
+                data_to_save["muscles_target"] = (
+                    muscles_target_to_save[
+                        :,
+                        estimator_instance.frame_to_save : estimator_instance.frame_to_save
+                        + estimator_instance.slide_size,
+                    ]
+                    if "muscle_target" in target.keys()
+                    else 0
+                )
+                if estimator_instance.kin_data_to_track == "q":
+                    kin_target = kin_target_to_save[
+                        :,
+                        estimator_instance.frame_to_save : estimator_instance.frame_to_save
+                        + estimator_instance.slide_size,
+                    ]
+
+                else:
+                    kin_target = kin_target_to_save[
+                        :,
+                        :,
+                        estimator_instance.frame_to_save : estimator_instance.frame_to_save
+                        + estimator_instance.slide_size,
+                    ]
+
+                if estimator_instance.use_torque:
+                    data_to_save["tau_est"] = sol.controls["tau"][
+                        :,
+                        estimator_instance.frame_to_save : estimator_instance.frame_to_save
+                        + estimator_instance.slide_size,
+                    ]
             else:
-                mhe.kalman = x_ref_to_save
+                if mhe.kalman is not None:
+                    mhe.kalman = np.append(mhe.kalman, x_ref_to_save, axis=1)
+                else:
+                    mhe.kalman = x_ref_to_save
 
-            data_to_save = {
-                "time": time() - initial_time,
-                "X_est": np.concatenate((q_est, dq_est), axis=0),
-                "U_est": u_est,
-                "kalman": x_ref_to_save,
-                # "f_est": force_est,
-                "none_conv_iter": stat,
-                "solver_options": estimator_instance.solver_options,
-            }
-            if t == 1:
-                data_to_save["Nmhe"] = estimator_instance.ns_mhe
-            data_to_save["muscles_target"] = muscles_target_to_save if "muscle_target" in target.keys() else 0
-            if estimator_instance.kin_data_to_track == "q":
-                kin_target = kin_target_to_save
+                data_to_save = {
+                    "time": time() - initial_time,
+                    "X_est": np.concatenate((q_est, dq_est), axis=0),
+                    "U_est": u_est,
+                    "kalman": x_ref_to_save,
+                    "f_est": force_est,
+                    "none_conv_iter": stat,
+                    "solver_options": estimator_instance.solver_options,
+                }
+                if t == 1:
+                    data_to_save["Nmhe"] = estimator_instance.ns_mhe
+                data_to_save["muscles_target"] = muscles_target_to_save if "muscle_target" in target.keys() else 0
+                if estimator_instance.kin_data_to_track == "q":
+                    kin_target = kin_target_to_save
 
-            else:
-                kin_target = kin_target_to_save
+                else:
+                    kin_target = kin_target_to_save
 
-            if estimator_instance.use_torque:
-                data_to_save["tau_est"] = sol.controls["tau"]
+                if estimator_instance.use_torque:
+                    data_to_save["tau_est"] = sol.controls["tau"]
 
             data_to_save["kin_target"] = kin_target
             data_to_save["sol_freq"] = 1 / time_tot
@@ -846,20 +818,30 @@ class CustomMhe(MovingHorizonEstimator):
         self.muscles_ref = None
         self.kin_target = None
         self.slide_size = 1
-        self.f_x, self.f_u, = None, None
+        self.f_x, self.f_u, = (
+            None,
+            None,
+        )
         self.kalman = None
         super(CustomMhe, self).__init__(**kwargs)
 
     def advance_window_initial_guess_states(self, sol, **advance_options):
         self.nlp[0].x_init.init[:, :] = np.concatenate(
-            (sol.states["all"][:, self.slide_size:], np.repeat(sol.states["all"][:, -1][:, np.newaxis],
-                                                               self.slide_size, axis=1)), axis=1
+            (
+                sol.states["all"][:, self.slide_size :],
+                np.repeat(sol.states["all"][:, -1][:, np.newaxis], self.slide_size, axis=1),
+            ),
+            axis=1,
         )
         return True
 
     def advance_window_initial_guess_controls(self, sol, **advance_options):
         self.nlp[0].u_init.init[:, :] = np.concatenate(
-            (sol.controls["all"][:, self.slide_size:-1], np.repeat(sol.controls["all"][:, -2][:, np.newaxis], self.slide_size, axis=1)), axis=1
+            (
+                sol.controls["all"][:, self.slide_size : -1],
+                np.repeat(sol.controls["all"][:, -2][:, np.newaxis], self.slide_size, axis=1),
+            ),
+            axis=1,
         )
         return True
 
@@ -869,7 +851,10 @@ class CustomMhe(MovingHorizonEstimator):
         return True
 
     def export_data(self, sol) -> tuple:
-        return sol.states["all"][:, self.frame_to_export:self.frame_to_export+1], sol.controls["all"][:, self.frame_to_export:self.frame_to_export+1]
+        return (
+            sol.states["all"][:, self.frame_to_export : self.frame_to_export + 1],
+            sol.controls["all"][:, self.frame_to_export : self.frame_to_export + 1],
+        )
 
     def _initialize_solution(self, states: list, controls: list):
         _states = InitialGuess(np.concatenate(states, axis=1), interpolation=InterpolationType.EACH_FRAME)
