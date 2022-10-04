@@ -16,7 +16,7 @@ def std(data, data_ref):
 
 
 if __name__ == "__main__":
-    conditions = [0.04, 0.05, 0.06, 0.07, 0.08, 0.09, 0.1, 0.11, 0.12]
+    conditions = [0.06, 0.07, 0.08, 0.09, 0.1, 0.11, 0.12]
     trials = [
         "data_abd_sans_poid",
         "data_abd_poid_2kg",
@@ -53,11 +53,11 @@ if __name__ == "__main__":
     t_ref = []
     nb_mhe = []
     n_frames = [0, 25, 50, 75, 100]
-    model = biorbd.Model(f"C3D/wu_scaled.bioMod")
+    model = biorbd.Model(f"data/wu_scaled.bioMod")
     result_dic_tmp = {}
     result_all_dic = {}
     n_init = [int(0)] * len(conditions)
-    with open("result_all_trials", "rb") as file:
+    with open("results/result_all_trials", "rb") as file:
         while True:
             try:
                 data_tmp = pickle.load(file)
@@ -102,35 +102,60 @@ if __name__ == "__main__":
             print(f"error_torque: {tot_err_ID[c, f]} +/- {tot_std_ID[c, f]}")
             print(f"error_emg: {tot_err_emg_phase[c, f]} +/- {tot_std_emg_phase[c, f]}")
 
+    # import matplotlib.pyplot as plt
+    # from matplotlib.offsetbox import OffsetImage, AnnotationBbox
+    #
+    # plt.rcParams["figure.figsize"] = [7.50, 3.50]
+    # plt.rcParams["figure.autolayout"] = True
+    #
+    #
+    # def getImage(path):
+    #     return OffsetImage(plt.imread(path, format="png"), zoom=.02
+    #                     )
+    #
+    #
+    # paths = ['figure_img/0_10.png', 'figure_img/0_10.png', 'figure_img/0_10.png', 'figure_img/0_10.png']
+    # x = [8, 4, 3, 6]
+    # y = [5, 3, 4, 7]
+    # fig, ax = plt.subplots()
+    # for x0, y0, path in zip(x, y, paths):
+    #     ab = AnnotationBbox(getImage(path), (x0, y0), frameon=False)
+    #     ax.add_artist(ab)
+    # plt.xticks(range(10))
+    # plt.yticks(range(10))
+    # plt.show()
+
+
+    # fig = plt.figure(num="fig_errors", constrained_layout=True)
+    fig, axs = plt.subplots(2, 2)
+    fig_names = ["a) Markers", "b) EMG", "c) Inverse dynamics"]
+    y_labels = ["RMSE (m)", "Phase error (%)", "RMSE (N.m)"]
+    x_label = "Time to solve a subproblem (ms)"
+    errors = [tot_err_mark, tot_err_emg_phase, tot_err_ID]
     color = seaborn.color_palette()
-    plt.figure("Markers error")
-    for c, cond in enumerate(conditions):
-        for f, frame in enumerate(n_frames):
-            plt.scatter(1 / tot_freq[c, f] * 1000, tot_err_mark[c, f], color=color[c], alpha=0.2 + 0.1 * f)
+    axs.resize(4, 1)
+    fig.delaxes(axs[-1][0])
 
-    plt.figure("ID error")
-    for c, cond in enumerate(conditions):
-        for f, frame in enumerate(n_frames):
-            plt.scatter(
-                1 / tot_freq[c, f] * 1000, tot_err_ID[c, f], color=color[c], alpha=0.2 + 0.1 * f, label=f"{cond}"
-            )
 
-    plt.figure("emg phase error")
-    for c, cond in enumerate(conditions):
-        for f, frame in enumerate(n_frames):
-            plt.scatter(1 / tot_freq[c, f] * 1000, tot_err_emg_phase[c, f], color=color[c], alpha=0.2 + 0.1 * f)
-
-    plt.figure("emg magnitude error")
-    for c, cond in enumerate(conditions):
-        for f, frame in enumerate(n_frames):
-            if f == len(n_frames) - 1:
-                plt.scatter(
-                    1 / tot_freq[c, f] * 1000,
-                    tot_err_emg_mag[c, f],
-                    color=color[c],
-                    alpha=0.2 + 0.1 * f,
-                    label=f"{cond}",
-                )
-            else:
-                plt.scatter(1 / tot_freq[c, f] * 1000, tot_err_emg_mag[c, f], color=color[c], alpha=0.2 + 0.1 * f)
+    for i in range(3):
+        ax = axs[i][0]
+        ax.set_title(fig_names[i])
+        for c, cond in enumerate(conditions):
+            for f, frame in enumerate(n_frames):
+                ax.scatter(1 / tot_freq[c, f] * 1000, errors[i][c, f], color=color[c], alpha=0.2 + 0.1 * f)
+                ax.set_ylabel(y_labels[i])
+                ax.set_xlabel(x_label)
+        # plt.figure("emg magnitude error")
+        # for c, cond in enumerate(conditions):
+        #     for f, frame in enumerate(n_frames):
+        #         if f == len(n_frames) - 1:
+        #             plt.scatter(
+        #                 1 / tot_freq[c, f] * 1000,
+        #                 tot_err_emg_mag[c, f],
+        #                 color=color[c],
+        #                 alpha=0.2 + 0.1 * f,
+        #                 label=f"{cond}",
+        #             )
+        #         else:
+        #             plt.scatter(1 / tot_freq[c, f] * 1000, tot_err_emg_mag[c, f], color=color[c], alpha=0.2 + 0.1 * f)
     plt.show()

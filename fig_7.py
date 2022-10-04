@@ -42,12 +42,13 @@ if __name__ == "__main__":
     model = biorbd.Model(f"data/wu_scaled.bioMod")
     result_dic_tmp = {}
     result_all_dic = {}
-    with open("results/result_abd_75", "rb") as file:
+    with open("results/result_all_trials", "rb") as file:
         while True:
             try:
                 data_tmp = pickle.load(file)
                 key = list(data_tmp.keys())[0]
-                result_all_dic[key] = data_tmp[key]
+                if key in trials:
+                    result_all_dic[key] = data_tmp[key]
             except:
                 break
 
@@ -74,8 +75,8 @@ if __name__ == "__main__":
     n_split = [[50, 290], [50, 245]]
     g = 0
     # plt.figure("Estimated activation and EMG signals" + key)
-    cond = 0.09
-    frame = 75
+    cond = 0.06
+    frame = 50
     count = 0
     b = 0
     for i in range(model.nbMuscles()):
@@ -104,12 +105,12 @@ if __name__ == "__main__":
                     alpha=0.8,
                     color=color[k],
                 )
-                axs.flat[1].plot(
-                    t,
-                    result_all_dic[key][str(cond)][str(frame)]["f_est"][i, n_split[k][0] : n_split[k][1]] / bw,
-                    label=labels[k],
-                    color=color[k],
-                )
+                # axs.flat[1].plot(
+                #     t,
+                #     result_all_dic[key][str(cond)][str(frame)]["f_est"][i, n_split[k][0] : n_split[k][1]] / bw,
+                #     label=labels[k],
+                #     color=color[k],
+                # )
                 axs.flat[0].set_xticklabels([])
                 axs.flat[1].set_xticklabels([])
                 if b - 1 in [0, 3, 6]:
