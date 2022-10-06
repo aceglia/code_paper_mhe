@@ -42,7 +42,7 @@ if __name__ == "__main__":
     model = biorbd.Model(f"data/wu_scaled.bioMod")
     result_dic_tmp = {}
     result_all_dic = {}
-    with open("results/result_all_trials", "rb") as file:
+    with open("results/result_all_trials_w6", "rb") as file:
         while True:
             try:
                 data_tmp = pickle.load(file)
@@ -66,17 +66,17 @@ if __name__ == "__main__":
     bw = 720
     color = seaborn.color_palette()
     fig = plt.figure(num="fig_muscle", constrained_layout=True)
-    subfigs = fig.subfigures(4, 3, wspace=0.05, hspace=0.1)
+    subfigs = fig.subfigures(5, 2, wspace=0.05, hspace=0.1)
     rmse_emg = []
     rmse_emg_full = []
     labels = ["Forces without weight", "Forces with 2 kg weight"]
     labels_target = ["Recorded EMG without weight", "Recorded EMG with 2 kg weight"]
     labels_est = ["Estimated EMG without weight", "Estimated EMG with 2 kg weight"]
-    n_split = [[50, 290], [50, 245]]
+    n_split = [[50, -1], [50, -1]]
     g = 0
     # plt.figure("Estimated activation and EMG signals" + key)
-    cond = 0.06
-    frame = 50
+    cond = 0.09
+    frame = 75
     count = 0
     b = 0
     for i in range(model.nbMuscles()):
@@ -113,9 +113,9 @@ if __name__ == "__main__":
                 # )
                 axs.flat[0].set_xticklabels([])
                 axs.flat[1].set_xticklabels([])
-                if b - 1 in [0, 3, 6]:
-                    axs.flat[0].set_ylabel("Activations\n (% MVC)\n", fontsize=12)
-                    axs.flat[1].set_ylabel("Force\n (% BW)\n", fontsize=12)
+                if b - 1 in [0, 2, 4, 6]:
+                    axs.flat[0].set_ylabel("Activations\n (% MVC)\n", fontsize=12, rotation=0)
+                    axs.flat[1].set_ylabel("Force\n (% BW)\n", fontsize=12, rotation=0)
                 else:
                     axs.flat[0].set_yticklabels([])
                     axs.flat[1].set_yticklabels([])
@@ -124,7 +124,7 @@ if __name__ == "__main__":
                 axs.flat[0].grid(True)
                 axs.flat[1].grid(True)
                 count += 1
-    for j in range(3):
+    for j in range(2):
         if g == 0:
             axb = subfigs.flat[b].subplots(1, 1)
             b += 1
@@ -132,10 +132,10 @@ if __name__ == "__main__":
                 n_split[0][0] : n_split[0][1]
             ]
             t1 = np.linspace(0, 100, t1.shape[0])
-            t2 = result_all_dic[list(result_all_dic.keys())[1]][str(cond)][str(frame)]["t_est"][
-                n_split[1][0] : n_split[1][1]
-            ]
-            t2 = np.linspace(0, 100, t2.shape[0])
+            # t2 = result_all_dic[list(result_all_dic.keys())[1]][str(cond)][str(frame)]["t_est"][
+            #     n_split[1][0] : n_split[1][1]
+            # ]
+            # t2 = np.linspace(0, 100, t2.shape[0])
             axb.plot(
                 t1,
                 result_all_dic[list(result_all_dic.keys())[0]][str(cond)][str(frame)]["X_est"][
@@ -145,19 +145,19 @@ if __name__ == "__main__":
                 label=cond,
                 color=color[0],
             )
-            axb.plot(
-                t2,
-                result_all_dic[list(result_all_dic.keys())[1]][str(cond)][str(frame)]["X_est"][
-                    6, n_split[1][0] : n_split[1][1]
-                ]
-                * (180 / np.pi),
-                color=color[1],
-                label=cond,
-            )
+            # axb.plot(
+            #     t2,
+            #     result_all_dic[list(result_all_dic.keys())[1]][str(cond)][str(frame)]["X_est"][
+            #         6, n_split[1][0] : n_split[1][1]
+            #     ]
+            #     * (180 / np.pi),
+            #     color=color[1],
+            #     label=cond,
+            # )
 
             axb.set_xlabel("Shoulder abduction (%)", fontsize=12)
-            if j == 1:
-                axb.set_ylabel("Joint angle (°)\n", fontsize=12)
+            if j == 0:
+                axb.set_ylabel("Joint angle (°)\n", fontsize=12, rotation=0)
             else:
                 axb.set_yticklabels([])
             axb.set_ylim(0, 100)

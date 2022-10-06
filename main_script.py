@@ -255,7 +255,6 @@ class MuscleForceEstimator:
                 self.rplt_force, self.layout_force, self.app_force = self.all_plot.init_plot_window(
                     self.all_plot.plot[0]
                 )
-
             if data_to_show == "q":
                 self.all_plot.msk_model = self.model_path
                 self.all_plot.add_new_plot(plot_type="skeleton")
@@ -314,22 +313,22 @@ class MuscleForceEstimator:
 
 
 if __name__ == "__main__":
-    data_dir = f"data/"
-    result_dir = "results/"
+    data_dir = f"/home/amedeoceglia/Documents/programmation/code_paper_mhe_data/data_final_new/subject_3/C3D/"
+    result_dir = "results/results_passive_torque/"
     trials = [
         "data_abd_sans_poid",
-        # "data_abd_poid_2kg",
-        # "data_cycl_poid_2kg",
-        # "data_flex_poid_2kg",
-        # "data_flex_sans_poid",
-        # "data_cycl_sans_poid",
+        "data_abd_poid_2kg",
+        "data_cycl_poid_2kg",
+        "data_flex_poid_2kg",
+        "data_flex_sans_poid",
+        "data_cycl_sans_poid",
     ]
-    # configs = [0.04, 0.05, 0.06, 0.07, 0.08, 0.09, 0.1, 0.11, 0.12]#, 0.08, 0.1, 1.2, 1.5]  # , "mhe"]
-    configs = [0.09]
+    configs = [0.04, 0.05, 0.06, 0.07, 0.08, 0.09, 0.1, 0.11, 0.12]#, 0.08, 0.1, 1.2, 1.5]  # , "mhe"]
+    exp_freq = [48, 45, 41, 39, 34, 31, 29, 29, 23]
     for c, config in enumerate(configs):
         for trial in trials:
             offline_path = data_dir + f"{trial}"
-            file_name = f"{trial}_result_duration_{config}_75_frame"
+            file_name = f"{trial}_result_duration_{config}"
 
             solver_options = {
                 "sim_method_jac_reuse": 1,
@@ -350,7 +349,7 @@ if __name__ == "__main__":
                 "save_results": True,
                 "track_emg": True,
                 "kin_data_to_track": "markers",
-                "exp_freq": 33,
+                "exp_freq": exp_freq[c],
                 "muscle_track_idx": [
                     14,
                     23,
@@ -373,7 +372,7 @@ if __name__ == "__main__":
                 "result_file_name": file_name,
                 "solver_options": solver_options,
                 "weights": configure_weights(),
-                "frame_to_save": 13,
+                "frame_to_save": 0,
                 "save_all_frame": True,
             }
             variables_dic = {"print_lvl": 1}  # print level 0 = no print, 1 = print information

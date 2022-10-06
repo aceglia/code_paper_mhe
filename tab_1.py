@@ -3,7 +3,6 @@ import matplotlib.pyplot as plt
 import glob
 import numpy as np
 
-subjects = ["subject_3"]  # , "subject_2"]
 nb_none_conv = []
 sol_freq = []
 nb_total_iter = []
@@ -13,18 +12,18 @@ process_lat = []
 process_std = []
 vicon_lat = []
 vicon_std = []
-for subject in subjects:
-    # files = glob.glob(f"{subject}/plot_**")
-    # # files = [f"{subject}/plot_delay_full_test_tronc_plot"]
-    # for file in files:
-    #     data_tmp = read_data(file)
-    #     delay_tmp = data_tmp["plot_delay"]
-    #     plot_lat.append(np.median(delay_tmp))
-    #     plot_std.append(np.std(delay_tmp))
+# files = glob.glob(f"{subject}/plot_**")
+# # files = [f"{subject}/plot_delay_full_test_tronc_plot"]
+# for file in files:
+#     data_tmp = read_data(file)
+#     delay_tmp = data_tmp["plot_delay"]
+#     plot_lat.append(np.median(delay_tmp))
+#     plot_std.append(np.std(delay_tmp))
 
-    files = glob.glob(f"{subject}/C3D/data_**")
-    # files = [f"{subject}/data_streaming_20220127-1820_compressed"]
-    for file in files:
+files = glob.glob(f"/home/amedeoceglia/Documents/programmation/code_paper_mhe_data/data_final_new/subject_3/C3D/data_c3d/data_**")
+# files = [f"{subject}/data_streaming_20220127-1820_compressed"]
+for file in files:
+    try:
         data_tmp = read_data(file)
         from biosiglive.io.save_data import add_data_to_pickle
 
@@ -43,12 +42,16 @@ for subject in subjects:
         else:
             vicon_lat.append([0])
             vicon_std.append([0])
+    except:
+        pass
 
-    files = glob.glob(f"{subject}/C3D/results_w4/data**")
-
-    for file in files:
+files = glob.glob(f"results/results_w5/data**")
+for file in files:
+    try:
         data_tmp = read_data(file)
         sol_freq.append(np.mean(data_tmp["sol_freq"][1:]))
+    except:
+        pass
 
 plot_lat = np.round(np.mean(plot_lat), 2)
 plot_std = np.round(np.mean(plot_std), 2)

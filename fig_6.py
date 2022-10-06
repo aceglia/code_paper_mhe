@@ -1,7 +1,7 @@
 import numpy as np
 import seaborn
 import pickle
-
+from matplotlib.offsetbox import OffsetImage, AnnotationBbox
 import biorbd
 import matplotlib.pyplot as plt
 
@@ -16,7 +16,7 @@ def std(data, data_ref):
 
 
 if __name__ == "__main__":
-    conditions = [0.06, 0.07, 0.08, 0.09, 0.1, 0.11, 0.12]
+    conditions = [0.04, 0.05, 0.06, 0.07, 0.08, 0.09, 0.1]
     trials = [
         "data_abd_sans_poid",
         "data_abd_poid_2kg",
@@ -56,8 +56,7 @@ if __name__ == "__main__":
     model = biorbd.Model(f"data/wu_scaled.bioMod")
     result_dic_tmp = {}
     result_all_dic = {}
-    n_init = [int(0)] * len(conditions)
-    with open("results/result_all_trials", "rb") as file:
+    with open("results/results_all_trials_w6_freq", "rb") as file:
         while True:
             try:
                 data_tmp = pickle.load(file)
@@ -76,9 +75,12 @@ if __name__ == "__main__":
     tot_std_emg_mag = np.zeros((len(conditions), len(n_frames)))
     tot_std_ID = np.zeros((len(conditions), len(n_frames)))
     tot_std_freq = np.zeros((len(conditions), len(n_frames)))
+    tot_delay = np.zeros((len(conditions), len(n_frames)))
+    tot_saturation  = np.zeros((len(conditions), len(n_frames)))
+    tot_grad  = np.zeros((len(conditions), len(n_frames)))
     for c, cond in enumerate(conditions):
         for f, frame in enumerate(n_frames):
-            err_id_tmp, err_tmp_mark, err_tmp_emg_mag, err_tmp_emg_phase, freq_tmp = [], [], [], [], []
+            err_id_tmp, err_tmp_mark, err_tmp_emg_mag, err_tmp_emg_phase, freq_tmp, saturation_tmp, grad_tmp  = [], [], [], [], [], [], []
             for key in result_all_dic.keys():
                 if np.isfinite(result_all_dic[key][str(cond)][str(frame)]["rmse_torque"]):
                     err_id_tmp.append(result_all_dic[key][str(cond)][str(frame)]["rmse_torque"])
@@ -86,6 +88,8 @@ if __name__ == "__main__":
                     err_tmp_emg_phase.append(result_all_dic[key][str(cond)][str(frame)]["phase_emg_err"])
                     err_tmp_mark.append(result_all_dic[key][str(cond)][str(frame)]["rmse_markers"])
                     freq_tmp.append(result_all_dic[key][str(cond)][str(frame)]["sol_freq_mean"])
+                    saturation_tmp.append(result_all_dic[key][str(cond)][str(frame)]["saturation"])
+                    grad_tmp.append(result_all_dic[key][str(cond)][str(frame)]["gradient"])
                 else:
                     print(key, cond, frame, result_all_dic[key][str(cond)][str(frame)]["rmse_torque"])
             tot_err_ID[c, f] = np.mean(err_id_tmp)
@@ -98,53 +102,73 @@ if __name__ == "__main__":
             tot_std_emg_phase[c, f] = np.std(err_tmp_emg_phase)
             tot_std_emg_mag[c, f] = np.std(err_tmp_emg_mag)
             tot_std_freq[c, f] = np.std(freq_tmp)
+            tot_delay[c, f] = (1 / tot_freq[c, f] + cond * (1 - (0.01 * frame))) * 1000
+            tot_saturation[c, f] = np.mean(saturation_tmp)
+            tot_grad[c, f] = np.mean(grad_tmp)
+
             print(f"error_markers: {tot_err_mark[c, f]} +/- {tot_std_mark[c, f]}")
             print(f"error_torque: {tot_err_ID[c, f]} +/- {tot_std_ID[c, f]}")
             print(f"error_emg: {tot_err_emg_phase[c, f]} +/- {tot_std_emg_phase[c, f]}")
+    from PIL import ImageColor
+    from matplotlib.ticker import FormatStrFormatter
+    def getImage(path, alpha=1, scale=0.03, color_wanted=(0,0,0)):
+        from matplotlib import cbook, colors as mcolors
 
-    # import matplotlib.pyplot as plt
-    # from matplotlib.offsetbox import OffsetImage, AnnotationBbox
-    #
-    # plt.rcParams["figure.figsize"] = [7.50, 3.50]
-    # plt.rcParams["figure.autolayout"] = True
-    #
-    #
-    # def getImage(path):
-    #     return OffsetImage(plt.imread(path, format="png"), zoom=.02
-    #                     )
-    #
-    #
-    # paths = ['figure_img/0_10.png', 'figure_img/0_10.png', 'figure_img/0_10.png', 'figure_img/0_10.png']
-    # x = [8, 4, 3, 6]
-    # y = [5, 3, 4, 7]
-    # fig, ax = plt.subplots()
-    # for x0, y0, path in zip(x, y, paths):
-    #     ab = AnnotationBbox(getImage(path), (x0, y0), frameon=False)
-    #     ax.add_artist(ab)
-    # plt.xticks(range(10))
-    # plt.yticks(range(10))
-    # plt.show()
-
-
-    # fig = plt.figure(num="fig_errors", constrained_layout=True)
-    fig, axs = plt.subplots(2, 2)
-    fig_names = ["a) Markers", "b) EMG", "c) Inverse dynamics"]
-    y_labels = ["RMSE (m)", "Phase error (%)", "RMSE (N.m)"]
+        from matplotlib.image import AxesImage
+        import matplotlib.pyplot as plt
+        from matplotlib.transforms import Bbox, TransformedBbox, BboxTransformTo
+        original_image = plt.imread(path)
+        cut_location = 70
+        b_and_h = original_image[:, :, 2:3]
+        color = original_image[:, :, 2:3] - original_image[:, :, 0:1]
+        color = np.ones((color.shape[0], color.shape[1], color.shape[2]))*0.4
+        alpha = original_image[:, :, 3:4]
+        nx = original_image.shape[1]
+        rgb = mcolors.to_rgba(color_wanted)[:3]
+        im = np.dstack(
+            #[b_and_h + color, alpha])
+            [b_and_h + color * (1-np.array(rgb)), alpha])
+        return OffsetImage(im, zoom=scale)
+        # return OffsetImage(plt.imread(path, format="png"), zoom=scale,alpha=0.4 + 0.1 * alpha)
+    colors = seaborn.color_palette()
+    fig, axs = plt.subplots(3, 2)
+    fig_names = ["a) Markers", "b) EMG", "c) Inverse dynamics", "d) Total delay", "e) Saturation", "f) Noise"]
+    y_labels = ["RMSE (mm)", "Phase error (%)", "RMSE (N.m)", "Delay (ms)", "Saturation (%)", "Gradient"]
     x_label = "Time to solve a subproblem (ms)"
-    errors = [tot_err_mark, tot_err_emg_phase, tot_err_ID]
-    color = seaborn.color_palette()
-    axs.resize(4, 1)
-    fig.delaxes(axs[-1][0])
-
-
-    for i in range(3):
+    errors = [tot_err_mark * 1000, tot_err_emg_phase, tot_err_ID, tot_delay, tot_saturation, tot_grad]
+    img_path = "results/img/frame_"
+    color = "white"
+    axs.resize(6, 1)
+    delay = 60
+    duration = 1 / tot_freq * 1000
+    delta = 1.5
+    c, f = 0, 0
+    x = np.linspace(duration.min()-delta, duration.max()+delta, 100)
+    line_delta = [-1.5, -0.75, 0, 0.75, 1.5]
+    x_ticks = []
+    for i in range(6):
         ax = axs[i][0]
         ax.set_title(fig_names[i])
         for c, cond in enumerate(conditions):
             for f, frame in enumerate(n_frames):
-                ax.scatter(1 / tot_freq[c, f] * 1000, errors[i][c, f], color=color[c], alpha=0.2 + 0.1 * f)
-                ax.set_ylabel(y_labels[i])
-                ax.set_xlabel(x_label)
+                if i == 3:
+                    ax.plot(x, [delay] * 100, alpha=0.5, linewidth=0.5)
+                    x_ticks.append(1 / tot_freq[c, f] * 1000)
+                ax.axvline(x=1 / tot_freq[c, f] * 1000, linestyle='dotted', color='grey', linewidth=0.5 )
+                ax.scatter(1 / tot_freq[c, f] * 1000 + line_delta[f], errors[i][c, f], color=color, alpha=0.2 + 0.1 * f)
+                ab = AnnotationBbox(getImage(img_path + f"{frame}.png", color_wanted=colors[c]), (1 / tot_freq[c, f] * 1000 + line_delta[f], errors[i][c, f]),
+                                    frameon=False)
+                ax.add_artist(ab)
+
+        ax.set_ylabel(y_labels[i])
+        ax.xaxis.set_major_formatter(FormatStrFormatter('%.0f'))
+        if i in [4, 5]:
+            ax.set_xlabel(x_label)
+            ax.set_xticks(x_ticks)
+        else:
+            ax.set_xlabel("")
+            ax.set_xticklabels([])
+
         # plt.figure("emg magnitude error")
         # for c, cond in enumerate(conditions):
         #     for f, frame in enumerate(n_frames):
