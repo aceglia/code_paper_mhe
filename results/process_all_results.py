@@ -93,15 +93,15 @@ if __name__ == "__main__":
     n_init = [int(0)] * len(conditions)
     for trial in trials:
         if "2kg" in trial:
-            model = biorbd.Model(f"C3D/wu_scaled_cylinder_2.bioMod")
+            model = biorbd.Model(f"wu_scaled_2kg.bioMod")
         else:
-            model = biorbd.Model(f"C3D/wu_scaled.bioMod")
+            model = biorbd.Model(f"wu_scaled.bioMod")
         result_dic = {}
         for c, cond in enumerate(conditions):
             result_dic_tmp = {}
             for f, frame in enumerate(n_frames):
-                file = f"{trial}_result_duration_{cond}_{frame}"
-                result_mat = load(file)
+                file = f"{trial}_result_duration_{cond}"
+                result_mat = read_data("results_w6_freq/" + file)
                 nb_mhe = int(result_mat["Nmhe"][0] + 1)
                 rmse_markers = []
                 rmse_torque = []
@@ -118,6 +118,8 @@ if __name__ == "__main__":
                 t_est = np.linspace(0, 100, nb_iter + 1)
                 t_ref = np.linspace(0, 100, nb_iter + 1)
                 n_frame = int((nb_mhe - 1) * frame / 100)
+                if frame == 100:
+                    n_frame = nb_mhe - 2
                 x_int = np.zeros((model.nbQ() * 2, nb_iter))
                 result_mat["ID_torque"] = get_id_torque(result_mat["X_est"][:, n_frame::nb_mhe][:, n_init[c] :], model)
                 result_mat["muscle_torque"] = get_muscular_torque(
@@ -145,7 +147,8 @@ if __name__ == "__main__":
                     std_torque.append(
                         np.sqrt(np.std((result_mat["est_tau_tot"][i, :] - result_mat["ID_torque"][i, :]) ** 2))
                     )
-
+                result_mat["saturation"] = np.where(result_mat["U_est"] > 0.95)[0].shape[0] * 100 / (result_mat["U_est"].shape[1]*result_mat["U_est"].shape[0])
+                result_mat["gradient"] = np.sum(np.abs(np.gradient(result_mat["U_est"])))
                 result_mat["rmse_torque"] = np.mean(rmse_torque)
                 result_mat["std_torque"] = np.mean(std_torque)
                 for m in range(model.nbMuscles()):
@@ -176,4 +179,4 @@ if __name__ == "__main__":
             result_dic[f"{cond}"] = result_dic_tmp
         result_all_dic[f"{trial}"] = result_dic
         dic_to_save = {f"{trial}": result_all_dic[f"{trial}"]}
-        save(dic_to_save, "result_all_trials")
+        add_data_to_pickle(dic_to_save, "result_all_trials")

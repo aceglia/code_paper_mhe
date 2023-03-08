@@ -1,0 +1,1134 @@
+version 4
+
+// File extracted from data_final_new/subject_3/wu_scaled.osim
+
+gravity	0 0 -9.8000000000000007
+
+// SEGMENT DEFINITION
+
+// Information about thorax segment
+    // Segment
+    //True segment where are applied inertial values.
+    // Segment
+    segment thorax
+        parent ground
+        RTinMatrix    0
+        RT	2.0375164034627535 -1.4487458180370156 0.4210988120349458  xyz  0.5193864673182456 0.697925946145763 1.034836047619842
+        //RT	1.53 0.05 -0.14 xyz 0.05 -0.00 1.35
+        //RT 0 0 0 xyz 0 0 0
+        //rotations xyz
+        //translations xyz
+        mass 37
+        inertia
+            2.405609775046097    0.0    0.0
+            0.0    0.6529964843269821    0.0
+            0.0    0.0    2.405609775046097
+        com    -0.078400531254932099 -0.013564195699797743 0
+        meshfile Geometry/thorax.vtp
+    endsegment
+
+    // Markers
+    /*marker    STER
+        parent    thorax
+        position    0.03713707316157977 0.00041377803770059618 -0.0072024503692571518
+    endmarker
+
+    marker    XIPH
+        parent    thorax
+        position    0.078837225571170566 -0.16207162327702396 -0.0014190488648135879
+    endmarker
+
+    marker    C7
+        parent    thorax
+        position    -0.087831950703968764 0.096426387834469218 -0.0093559837618181207
+    endmarker
+
+    marker    T10
+        parent    thorax
+        position    -0.13195250666224223 -0.17531900835289271 0.0056894080878219233
+    endmarker*/
+
+// Information about clavicle segment
+    // Segment
+    segment clavicle_parent_offset
+        parent thorax 
+        RTinMatrix    0
+        RT	0.0 0.0 0.0	xyz	0.006669612180162364 0.006448977215408352 0.02369746125949272
+    endsegment
+
+    // Segments to define transformation axis.
+    // Segment
+    segment clavicle_translation
+        parent clavicle_parent_offset 
+        RTinMatrix    1
+        RT
+            1.0    0.0    0.0    0
+            0.0    1.0    0.0    0
+            0.0    0.0    1.0    0
+            0    0    0    1
+    endsegment
+    // Segment
+    segment clavicle_sternoclavicular_r1
+        parent clavicle_translation 
+        RTinMatrix    1
+        RT
+            0.015299995    0.827627886    0.561068617    0
+            0.989298698    0.068899965    -0.12861136    0
+            -0.145099956    0.557032205    -0.81771702    0
+            0    0    0    1
+        rotations x
+        ranges		-1.570796326795	1.8326
+    endsegment
+    // Segment
+    segment clavicle_sternoclavicular_r2
+        parent clavicle_sternoclavicular_r1 
+        RTinMatrix    1
+        RT
+            0.936165273    1.9628e-05    -0.351560209    0
+            0.165991127    -0.881539892    0.441966474    0
+            -0.309905674    -0.47210954    -0.825270292    0
+            0    0    0    1
+        rotations y
+        ranges		-1.570796326795	1.570796326795
+    endsegment
+    // Segment
+    segment clavicle_sternoclavicular_r3
+        parent clavicle_sternoclavicular_r2 
+        RTinMatrix    1
+        RT
+            -0.784546407    0.51109401    0.351098061    0
+            -0.545864853    -0.837873234    -6.9262e-05    0
+            0.294140268    -0.191706431    0.936338692    0
+            0    0    0    1
+        //rotations z
+        //ranges		-1.570796326795	1.570796326795
+    endsegment
+
+    // Segment to cancel transformation bases effect.
+    // Segment
+    segment clavicle_reset_axis
+        parent clavicle_sternoclavicular_r3 
+        RTinMatrix    1
+        RT
+            0.530058688    -0.828972643    0.178443675    0
+            0.84158235    0.540054199    0.008978295    0
+            -0.103812017    0.145416024    0.983909165    0
+            0    0    0    1
+    endsegment
+
+    //True segment where are applied inertial values.
+    // Segment
+    segment clavicle
+        parent clavicle_reset_axis 
+        RTinMatrix    0
+        RT	-0.0 -0.0 -0.0	xyz	0.0 0.0 0.0
+        mass 0.37054701905347265
+        inertia
+            0.00122800 0 0
+            0 0.00109900 0
+            0 0 0.0003900
+        com    -0.015226892996788581 0.01016932171631418 0.078986117335918357
+        meshfile Geometry/clavicle.vtp
+    endsegment
+
+    // Markers
+    marker    CLAV_SC
+        parent    clavicle
+        position    0.02381656604693716 0.016556031472434007 -0.01017161623958579
+    endmarker
+
+    marker    CLAV_AC
+        parent    clavicle
+        position    -0.013813380767876859 0.038314846759734955 0.14291074194270309
+    endmarker
+
+// Information about scapula segment
+    // Segment
+    segment scapula_parent_offset
+        parent clavicle 
+        RTinMatrix    0
+        RT	-0.52 0.52 0.0	xyz	-0.01715358089378901 0.024024567692480417 0.16224013387726688
+    endsegment
+
+    // Segments to define transformation axis.
+    // Segment
+    segment scapula_translation
+        parent scapula_parent_offset 
+        RTinMatrix    1
+        RT
+            1.0    0.0    0.0    0
+            0.0    1.0    0.0    0
+            0.0    0.0    1.0    0
+            0    0    0    1
+    endsegment
+// Rotation transform was initially an orthogonal basis
+    // Segment
+    segment scapula_rotation_transform
+        parent scapula_translation 
+        RTinMatrix    1
+        RT
+            0.0    0.0    -1.0    0
+            0.0    1.0    0.0    0
+            1.0    0.0    0.0    0
+            0    0    0    1
+        rotations xyz
+        ranges -3 3
+        -3 3
+        -3 3
+    endsegment
+
+    // Segment to cancel transformation bases effect.
+    // Segment
+    segment scapula_reset_axis
+        parent scapula_rotation_transform 
+        RTinMatrix    1
+        RT
+            0.0    0.0    1.0    0
+            0.0    1.0    0.0    0
+            -1.0    -0.0    -0.0    0
+            0    0    0    1
+    endsegment
+
+    //True segment where are applied inertial values.
+    // Segment
+    segment scapula
+        parent scapula_reset_axis 
+        RTinMatrix    0
+        RT	0.5832133965420941 -0.4458246964234714 0.27717166315597463	xyz	-0.0 -0.0 -0.0
+        mass 0.92636754763368157
+        inertia
+            0.01912900 0 0
+            0 0.03007200 0
+            0 0 0.0112420
+        com    -0.083284956152824746 -0.045355604304949074 -0.075592775136939766
+        meshfile Geometry/scapula.vtp
+    endsegment
+
+    // Markers
+    marker    SCAP_IA
+        parent    scapula
+        position    -0.15623931504004729 -0.13480014021687048 -0.069559788255012633
+    endmarker
+
+    marker    Acrom
+        parent    scapula
+        position    -0.043294999948983559 0.0090013047636502419 0.013984926415506305
+    endmarker
+
+    marker    SCAP_AA
+        parent    scapula
+        position    -0.1189341533369116 0.0024536125669540887 -0.099521471935609951
+    endmarker
+
+// Information about humerus segment
+    // Segment
+    segment humerus_parent_offset
+        parent scapula 
+        RTinMatrix    0
+        RT	0.0 0.0 0.0	xyz	-0.009621889089752405 -0.03444042171111652 0.00911658221764849
+    endsegment
+
+    // Segments to define transformation axis.
+    // Segment
+    segment humerus_translation
+        parent humerus_parent_offset 
+        RTinMatrix    1
+        RT
+            1.0    0.0    0.0    0
+            0.0    1.0    0.0    0
+            0.0    0.0    1.0    0
+            0    0    0    1
+    endsegment
+    // Segment
+    segment humerus_shoulder_plane
+        parent humerus_translation 
+        RTinMatrix    1
+        RT
+            0.0001    -0.706087029    0.708125058    0
+            0.99999999    -2.04e-07    -0.000141421    0
+            0.0001    0.708125065    0.706087022    0
+            0    0    0    1
+        rotations x
+        ranges		-6 6
+    endsegment
+    // Segment
+    segment humerus_shoulder_ele
+        parent humerus_shoulder_plane 
+        RTinMatrix    1
+        RT
+            0.907625996    0.0001    -0.419779753    0
+            0.29719357    0.706084421    0.642744718    0
+            0.296464218    -0.708127658    0.640830856    0
+            0    0    0    1
+        rotations y
+        ranges		-6 6
+    endsegment
+    // Segment
+    segment humerus_shoulder_rotation
+        parent humerus_shoulder_ele 
+        RTinMatrix    1
+        RT
+            0.36468841    0.208071174    0.907584018    0
+            0.495560336    -0.868573517    0.0    0
+            0.788303442    0.449762641    -0.419870516    0
+            0    0    0    1
+        rotations z
+        ranges		-6 6
+    endsegment
+
+    // Segment to cancel transformation bases effect.
+    // Segment
+    segment humerus_reset_axis
+        parent humerus_shoulder_rotation 
+        RTinMatrix    1
+        RT
+            -0.495563508    9.9113e-05    0.868571701    0
+            0.868571684    -0.000173715    0.495563517    0
+            0.0002    0.99999998    0.0    0
+            0    0    0    1
+    endsegment
+
+    //True segment where are applied inertial values.
+    // Segment
+    segment humerus
+        parent humerus_reset_axis 
+        RTinMatrix    0
+        RT	-0.0 -0.0 -0.0	xyz	0.0 0.0 0.0
+        mass 3.765684081130916
+        inertia
+            0.019520955320749378    0.0    0.0
+            0.0    0.006734114013394272    0.0
+            0.0    0.0    0.021911578287758575
+        com    0 -0.18159765807409017 0
+        meshfile Geometry/humerus.vtp
+    endsegment
+
+    // Markers
+    marker    EPICl
+        parent    humerus
+        position    -0.029621165544012062 -0.31452690698614161 0.016119572502533389
+    endmarker
+
+    marker    EPICm
+        parent    humerus
+        position    0.01226862067264467 -0.31988991452484083 -0.053877729707240724
+    endmarker
+
+    marker    DELT
+        parent    humerus
+        position    -0.010203708854547133 -0.12820857665865515 0.036623995648166582
+    endmarker
+
+    marker    ARMl
+        parent    humerus
+        position    -0.016803091483410415 -0.17716768997679022 0.0368333501802241
+    endmarker
+
+// Information about ulna segment
+    // Segment
+    segment ulna_parent_offset
+        parent humerus 
+        RTinMatrix    0
+        RT	0.0 0.0 0.0	xyz	0.006733927253539722 -0.32057932141016177 -0.013578194847304196
+    endsegment
+
+    // Segments to define transformation axis.
+    // Segment
+    segment ulna_translation
+        parent ulna_parent_offset 
+        RTinMatrix    1
+        RT
+            1.0    0.0    0.0    0
+            0.0    1.0    0.0    0
+            0.0    0.0    1.0    0
+            0    0    0    1
+    endsegment
+    // Segment
+    segment ulna_rotation1
+        parent ulna_translation 
+        RTinMatrix    1
+        RT
+            1.0    0.0    0.0    0
+            0.0    0.959018859    -0.283342245    0
+            0.0    0.283342245    0.959018859    0
+            0    0    0    1
+    endsegment
+    // Segment
+    segment ulna_rotation2
+        parent ulna_rotation1 
+        RTinMatrix    1
+        RT
+            0.56781638    0.0    -0.823155246    0
+            0.233234656    0.959018859    0.160886368    0
+            0.789421405    -0.283342245    0.544546617    0
+            0    0    0    1
+    endsegment
+    // Segment
+    segment ulna_elbow_flexion
+        parent ulna_rotation2 
+        RTinMatrix    1
+        RT
+            0.32599865    0.414515203    0.849648178    0
+            -0.820592423    0.5703407    0.036600009    0
+            -0.469417676    -0.709146411    0.526078333    0
+            0    0    0    1
+        rotations z
+        ranges		-1	3
+    endsegment
+
+    // Segment to cancel transformation bases effect.
+    // Segment
+    segment ulna_reset_axis
+        parent ulna_elbow_flexion 
+        RTinMatrix    1
+        RT
+            0.571510996    -0.820592423    0.001804454    0
+            0.819106111    0.5703407    -0.061454584    0
+            0.049400012    0.036600009    0.99810825    0
+            0    0    0    1
+    endsegment
+
+    //True segment where are applied inertial values.
+    // Segment
+    segment ulna
+        parent ulna_reset_axis 
+        RTinMatrix    0
+        RT	-0.0 -0.0 -0.0	xyz	0.0 0.0 0.0
+        mass 1.1255365703749232
+        inertia
+            0.005597601429871109    0.0    0.0
+            0.0    0.0011678973707888482    0.0
+            0.0    0.0    0.006071932051346554
+        com    0 -0.13895978008493326 0
+        meshfile Geometry/ulna.vtp
+    endsegment
+
+    // Markers
+    marker    LARM_elb
+        parent    ulna
+        position    -0.023660574371636267 -0.02464230430845693 -0.027296592754953164
+    endmarker
+
+// Information about radius segment
+    // Segment
+    segment radius_parent_offset
+        parent ulna 
+        RTinMatrix    0
+        RT	0.0 0.0 0.0	xyz	0.0004611829519268126 -0.013262408024793466 0.02305801864056069
+    endsegment
+
+    // Segments to define transformation axis.
+    // Segment
+    segment radius_translation
+        parent radius_parent_offset 
+        RTinMatrix    1
+        RT
+            1.0    0.0    0.0    0
+            0.0    1.0    0.0    0
+            0.0    0.0    1.0    0
+            0    0    0    1
+    endsegment
+    // Segment
+    segment radius_rotation1
+        parent radius_translation 
+        RTinMatrix    1
+        RT
+            1.0    0.0    0.0    0
+            0.0    0.241569058    -0.970383631    0
+            0.0    0.970383631    0.241569058    0
+            0    0    0    1
+    endsegment
+    // Segment
+    segment radius_pro_sup
+        parent radius_rotation1 
+        RTinMatrix    1
+        RT
+            0.891197008    -0.017160994    -0.453291731    0
+            0.451769014    0.123673477    0.883521154    0
+            0.040898064    -0.992174567    0.117970238    0
+            0    0    0    1
+        rotations y
+        ranges		-1.91986	1.570796326795
+    endsegment
+    // Segment
+    segment radius_rotation3
+        parent radius_pro_sup 
+        RTinMatrix    1
+        RT
+            0.836996179    0.313834882    0.448268963    0
+            -0.29173469    0.948983904    -0.119667957    0
+            -0.46295601    -0.030613984    0.885852424    0
+            0    0    0    1
+        ranges		-1.91986	1.570796326795
+    endsegment
+
+    // Segment to cancel transformation bases effect.
+    // Segment
+    segment radius_reset_axis
+        parent radius_rotation3 
+        RTinMatrix    1
+        RT
+            0.960789079    -0.277280267    -0.0    0
+            0.277280267    0.960789079    0.0    0
+            0.0    -0.0    1.0    0
+            0    0    0    1
+    endsegment
+
+    //True segment where are applied inertial values.
+    // Segment
+    segment radius
+        parent radius_reset_axis 
+        RTinMatrix    0
+        RT	-0.0 -0.0 -0.0	xyz	0.0 0.0 0.0
+        mass 1.1255365703749232
+        inertia
+            0.005597601429871109    0.0    0.0
+            0.0    0.0011678973707888482    0.0
+            0.0    0.0    0.006071932051346554
+        com    0 -0.13895978008493326 0
+        meshfile Geometry/radius.vtp
+    endsegment
+
+    // Markers
+
+    marker    STYLu
+        parent    radius
+        position    0.0030142903439038665 -0.2649794961463755 0.037325761416661551
+    endmarker
+
+    marker    STYLr
+        parent    radius
+        position    0.066473225728948357 -0.25632625013454524 0.030137412128238172
+    endmarker
+
+// Information about hand_r segment
+    // Segment
+    segment hand_r_parent_offset
+        parent radius 
+        RTinMatrix    0
+        RT	0.0 0.0 0.0	xyz	0.01973267939076038 -0.26529557663862663 0.027406530513716637
+    endsegment
+
+    // Segments to define transformation axis.
+    // Segment
+    segment hand_r_translation
+        parent hand_r_parent_offset 
+        RTinMatrix    1
+        RT
+            1.0    0.0    0.0    0
+            0.0    1.0    0.0    0
+            0.0    0.0    1.0    0
+            0    0    0    1
+    endsegment
+// Rotation transform was initially an orthogonal basis
+    // Segment
+    segment hand_r_rotation_transform
+        parent hand_r_translation 
+        RTinMatrix    1
+        RT
+            0.0    0.0    1.0    0
+            0.0    1.0    0.0    0
+            1.0    0.0    0.0    0
+            0    0    0    1
+        //rotations xyz
+    endsegment
+
+    // Segment to cancel transformation bases effect.
+    // Segment
+    segment hand_r_reset_axis
+        parent hand_r_rotation_transform 
+        RTinMatrix    1
+        RT
+            0.0    0.0    1.0    0
+            0.0    1.0    0.0    0
+            1.0    0.0    0.0    0
+            0    0    0    1
+    endsegment
+
+    //True segment where are applied inertial values.
+    // Segment
+    segment hand_r
+        parent hand_r_reset_axis 
+        RTinMatrix    0
+        RT	-0.0 -0.0 -0.0	xyz	0.0 0.0 0.0
+        mass 0.8476263060848187
+        inertia
+            0.0008813022857641476    0.0    0.0
+            0.0    0.0005404398546109739    0.0
+            0.0    0.0    0.0013239294427398632
+        com    0 -0.068095000000000003 0
+        //meshfile Geometry/pisiform.vtp
+    endsegment
+
+    /*segment cylindre
+        parent hand_r
+        RTinMatrix 0
+        RT 0 0 0 xyz 0 -0.04 0
+        //RT
+        //1   0   0   0
+        //0   1   0   0
+        //0   0   1   0
+        //0   0   0   1
+        mass 2
+        inertia
+			0.00695 0   0
+			0   0.00695  0
+			0   0   0.0064
+		com 0 0 0
+		mesh -0.07 0 0
+		mesh 0.07 0 0
+	endsegment*/
+    // Markers
+// MUSCLE DEFINIION
+
+// thorax > scapula
+musclegroup thorax_to_scapula
+    OriginParent        thorax
+    InsertionParent        scapula
+endmusclegroup
+
+    muscle    LVS
+        type    hilldegroote
+        musclegroup    thorax_to_scapula
+        OriginPosition    -0.039293270237076974 0.087882689900714184 0.02097896941176584
+        InsertionPosition    -0.078249836705072101 0.00078190393296821746 -0.1112415491733266
+        optimalLength    0.15471661527637151
+        maximalForce    169.95639725599801
+        tendonSlackLength    0.0054704045654679874
+        pennationAngle    0
+    endmuscle
+
+
+    muscle    TRPsup_bis
+        type    hilldegroote
+        musclegroup    thorax_to_scapula
+        OriginPosition    -0.08169308817571852 0.029274256840409948 0.0033213909375322541
+        InsertionPosition    -0.045112655196556842 -0.0030024247989529611 -0.011629618753622282
+        optimalLength    0.099953715127489032
+        maximalForce    162.449964047061
+        tendonSlackLength    0.050159037830031554
+        pennationAngle    0
+    endmuscle
+
+
+    muscle    TRPmed
+        type    hilldegroote
+        musclegroup    thorax_to_scapula
+        OriginPosition    -0.097187119103410241 -0.014335571543080468 0.002332067849472898
+        InsertionPosition    -0.06748863534488074 -0.0075703693553921154 -0.051653947073048496
+        optimalLength    0.091836520653237524
+        maximalForce    155.28316683500699
+        tendonSlackLength    0.022341124412390698
+        pennationAngle    0
+    endmuscle
+
+
+    muscle    TRPinf
+        type    hilldegroote
+        musclegroup    thorax_to_scapula
+        OriginPosition    -0.12230008945211038 -0.098236982673290132 0.00063617301189255332
+        InsertionPosition    -0.091604111986760411 -0.015053300557781186 -0.091758096134558126
+        optimalLength    0.12912440716194074
+        maximalForce    557.24345537557701
+        tendonSlackLength    0.0050355545431983234
+        pennationAngle    0
+    endmuscle
+
+
+    muscle    RMN
+        type    hilldegroote
+        musclegroup    thorax_to_scapula
+        OriginPosition    -0.066432466071386018 0.052077314028876928 0.0027917670889000255
+        InsertionPosition    -0.091448045953252274 -0.015296713302992399 -0.11659804770298496
+        optimalLength    0.17539123965944653
+        maximalForce    301.61706145578802
+        tendonSlackLength    0.030413672632766883
+        pennationAngle    0
+    endmuscle
+
+
+    muscle    RMJ1
+        type    hilldegroote
+        musclegroup    thorax_to_scapula
+        OriginPosition    -0.083366397828273667 0.008784787692789852 0.0013342608492715987
+        InsertionPosition    -0.10450177573593813 -0.049152053026451828 -0.12115532585822947
+        optimalLength    0.19983401375810972
+        maximalForce    185.935898822876
+        tendonSlackLength    0.022580657081923527
+        pennationAngle    0
+    endmuscle
+
+
+    muscle    RMJ2
+        type    hilldegroote
+        musclegroup    thorax_to_scapula
+        OriginPosition    -0.091740137663314236 -0.023264679074650171 0.0013342608492715854
+        InsertionPosition    -0.1156732423565847 -0.11547670809021419 -0.11280757540760267
+        optimalLength    0.16542106155109382
+        maximalForce    111.570078855478
+        tendonSlackLength    0.056528875092780297
+        pennationAngle    0
+    endmuscle
+
+
+    muscle    SRA1
+        type    hilldegroote
+        musclegroup    thorax_to_scapula
+        OriginPosition    -0.00099546589356760344 -0.052267712057144956 0.11150231196629734
+        InsertionPosition    -0.10161923911962593 -0.054946046207199339 -0.11464000843335001
+        optimalLength    0.072683514523150902
+        maximalForce    365.11775335508798
+        tendonSlackLength    0.059540142608261314
+        pennationAngle    0
+    endmuscle
+
+
+    muscle    SRA2
+        type    hilldegroote
+        musclegroup    thorax_to_scapula
+        OriginPosition    -0.00066002558111732566 -0.094930216917635132 0.1282582717775517
+        InsertionPosition    -0.10769261581418378 -0.07244127395965666 -0.11457315349708726
+        optimalLength    0.086401238596727575
+        maximalForce    179.96260532400399
+        tendonSlackLength    0.032629083960516995
+        pennationAngle    0
+    endmuscle
+
+
+    muscle    SRA3
+        type    hilldegroote
+        musclegroup    thorax_to_scapula
+        OriginPosition    -0.011993110094135099 -0.15058524056298181 0.13853509868568525
+        InsertionPosition    -0.11206830841280103 -0.090035365981496487 -0.11425204721231008
+        optimalLength    0.13359711569893717
+        maximalForce    377.92166433725902
+        tendonSlackLength    0.0081596758840981314
+        pennationAngle    0
+    endmuscle
+
+
+    muscle    PMN
+        type    hilldegroote
+        musclegroup    thorax_to_scapula
+        OriginPosition    0.034212741707239001 -0.069866836470052915 0.083211404942471673
+        InsertionPosition    0.013880809233343233 -0.047995563924464135 -0.030841802823736733
+        optimalLength    0.15925256452335201
+        maximalForce    218.72293530659101
+        tendonSlackLength    0.005819737036005068
+        pennationAngle    0
+    endmuscle
+
+
+// thorax > clavicle
+musclegroup thorax_to_clavicle
+    OriginParent        thorax
+    InsertionParent        clavicle
+endmusclegroup
+
+    muscle    TRPsup
+        type    hilldegroote
+        musclegroup    thorax_to_clavicle
+        OriginPosition    -0.062172517088645449 0.090127239989840555 0.0017911694509314645
+        InsertionPosition    -0.036626726315218822 0.029741432736120944 0.11761716138269099
+        optimalLength    0.11030345239145285
+        maximalForce    280.56713981164
+        tendonSlackLength    0.016521852226938437
+        pennationAngle    0
+    endmuscle
+
+
+    muscle    SBCL
+        type    hilldegroote
+        musclegroup    thorax_to_clavicle
+        OriginPosition    -0.0009784155217950753 -0.012282819467724099 0.036410356273422241
+        InsertionPosition    -0.018850613863569014 0.010875641244642452 0.09062686031534177
+        optimalLength    0.029375230784878054
+        maximalForce    195.80764894274199
+        tendonSlackLength    0.053559668137906483
+        pennationAngle    0
+    endmuscle
+
+
+// clavicle > humerus
+musclegroup clavicle_to_humerus
+    OriginParent        clavicle
+    InsertionParent        humerus
+endmusclegroup
+
+    muscle    DELTant
+        type    hilldegroote
+        musclegroup    clavicle_to_humerus
+        OriginPosition    -0.028930549304039273 0.023083927982451347 0.11852470888760597
+        InsertionPosition    0.0050329079026356265 -0.11475129663108768 0.0085610973004623652
+        optimalLength    0.20042873337949529
+        maximalForce    556.79999999999995
+        tendonSlackLength    0.035807188098049191
+        pennationAngle    0.383972435439
+    endmuscle
+
+        viapoint    DELT1-P2
+            parent    clavicle
+            muscle    DELTant
+            musclegroup    clavicle_to_humerus
+            position    -0.0027612583811637737 0.037712797558249349 0.15635444882482993
+        endviapoint
+
+    muscle    PECM1
+        type    hilldegroote
+        musclegroup    clavicle_to_humerus
+        OriginPosition    0.001323227899455394 0.0072819894980728434 0.061433563878967964
+        InsertionPosition    0.017662758194255383 -0.044704113157282885 0.0055196077838256599
+        optimalLength    0.12063221005827005
+        maximalForce    983.39999999999998
+        tendonSlackLength    0.056491181295580062
+        pennationAngle    0.29670597283900002
+    endmuscle
+
+        viapoint    PECM1-P2
+            parent    clavicle
+            muscle    PECM1
+            musclegroup    clavicle_to_humerus
+            position    -0.00058155445064093458 0.0066679673643842445 0.070817318944180627
+        endviapoint
+
+// scapula > humerus
+musclegroup scapula_to_humerus
+    OriginParent        scapula
+    InsertionParent        humerus
+endmusclegroup
+
+    muscle    DELTmed
+        type    hilldegroote
+        musclegroup    scapula_to_humerus
+        OriginPosition    -0.031844221270936279 -0.0037240529291588261 0.0016587823935727375
+        InsertionPosition    0.0050329079026356265 -0.11475129663108768 0.0085610973004623652
+        optimalLength    0.14797510933911964
+        maximalForce    1098.4000000000001
+        tendonSlackLength    0.052431241321220838
+        pennationAngle    0.26179938779900003
+    endmuscle
+
+        viapoint    DELT2-P2
+            parent    scapula
+            muscle    DELTmed
+            musclegroup    scapula_to_humerus
+            position    -0.031974595349283291 -0.0056281524206726868 0.02135336534696616
+        endviapoint
+        viapoint    DELT2-P3
+            parent    humerus
+            muscle    DELTmed
+            musclegroup    scapula_to_humerus
+            position    -0.0038640044549566759 -0.063969939569593848 0.031308490275692734
+        endviapoint
+
+    muscle    DELTpost
+        type    hilldegroote
+        musclegroup    scapula_to_humerus
+        OriginPosition    -0.068319744906151614 -0.0018243597857168286 -0.044728383448374862
+        InsertionPosition    0.0050329079026356265 -0.11475129663108768 0.0085610973004623652
+        optimalLength    0.13910352402675832
+        maximalForce    944.70000000000005
+        tendonSlackLength    0.11044457322971457
+        pennationAngle    0.31415926535900002
+    endmuscle
+
+        viapoint    DELT3-P2
+            parent    scapula
+            muscle    DELTpost
+            musclegroup    scapula_to_humerus
+            position    -0.083502582125954211 -0.027585663541666618 0.0069513736818853783
+        endviapoint
+        viapoint    DELT3-P3
+            parent    humerus
+            muscle    DELTpost
+            musclegroup    scapula_to_humerus
+            position    -0.020515818827660598 -0.054867138292994964 0.006513844443687463
+        endviapoint
+
+    muscle    SUPSP
+        type    hilldegroote
+        musclegroup    scapula_to_humerus
+        OriginPosition    -0.077547388425137503 -0.013478157741287473 -0.075008199626072553
+        InsertionPosition    0.015736286269801555 0.018594772025292874 0.023120320296100356
+        optimalLength    0.13384565805144488
+        maximalForce    410.69999999999999
+        tendonSlackLength    0.028492466263311918
+        pennationAngle    0.12217304764
+    endmuscle
+
+        viapoint    SUPSP-P2
+            parent    scapula
+            muscle    SUPSP
+            musclegroup    scapula_to_humerus
+            position    -0.064985029879003703 -0.0015549850402569107 -0.047337144097633961
+        endviapoint
+        viapoint    SUPSP-P3
+            parent    humerus
+            muscle    SUPSP
+            musclegroup    scapula_to_humerus
+            position    0.0039363689405786887 0.034476983007532942 0.006090895282848033
+        endviapoint
+
+    muscle    INFSP
+        type    hilldegroote
+        musclegroup    scapula_to_humerus
+        OriginPosition    -0.1017754059058994 -0.063443004720121654 -0.080655415833115918
+        InsertionPosition    -0.005627324136429173 0.0088764961838641819 0.029139880759354964
+        optimalLength    0.15235034287060512
+        maximalForce    864.60000000000002
+        tendonSlackLength    0.038807305780343103
+        pennationAngle    0.32288591161899999
+    endmuscle
+
+        viapoint    INFSP-P2
+            parent    scapula
+            muscle    INFSP
+            musclegroup    scapula_to_humerus
+            position    -0.049350820270488101 -0.056386972674377665 -0.025474668281491121
+        endviapoint
+
+    muscle    SUBSC
+        type    hilldegroote
+        musclegroup    scapula_to_humerus
+        OriginPosition    -0.083284956152824746 -0.045355604304949074 -0.075592775136939766
+        InsertionPosition    0.022077921838127207 -0.0091755089842304148 -0.0019304577284354569
+        optimalLength    0.18729187948833817
+        maximalForce    944.29999999999995
+        tendonSlackLength    0.0086071635794272849
+        pennationAngle    0.34906585039900001
+    endmuscle
+
+        viapoint    SUBSC-P2
+            parent    scapula
+            muscle    SUBSC
+            musclegroup    scapula_to_humerus
+            position    -0.045238596153228991 -0.037549784019482495 -0.03880979697731949
+        endviapoint
+        viapoint    SUBSC-P3
+            parent    humerus
+            muscle    SUBSC
+            musclegroup    scapula_to_humerus
+            position    0.0082037256867984534 0.01145276487410074 -0.025043027850127093
+        endviapoint
+
+    muscle    TMIN
+        type    hilldegroote
+        musclegroup    scapula_to_humerus
+        OriginPosition    -0.094852784152309882 -0.078478173408825513 -0.047600917209797922
+        InsertionPosition    0.0072376775184289444 -0.0040339214930290484 0.023930988539252709
+        optimalLength    0.051913973171802748
+        maximalForce    605.39999999999998
+        tendonSlackLength    0.11895519680426293
+        pennationAngle    0.418879020479
+    endmuscle
+
+        viapoint    TMIN-P2
+            parent    scapula
+            muscle    TMIN
+            musclegroup    scapula_to_humerus
+            position    -0.08677704699943016 -0.061231017988046213 -0.011941101979391938
+        endviapoint
+        viapoint    TMIN-P3
+            parent    humerus
+            muscle    TMIN
+            musclegroup    scapula_to_humerus
+            position    -0.0093582913118212662 -0.015650037900310203 0.029678850031092965
+        endviapoint
+
+    muscle    TMAJ
+        type    hilldegroote
+        musclegroup    scapula_to_humerus
+        OriginPosition    -0.12112094437839531 -0.12531755211737589 -0.082751419380311275
+        InsertionPosition    0.0040834118924676036 -0.049676514341141842 -0.0074658758680549104
+        optimalLength    0.16232687741598159
+        maximalForce    234.90000000000001
+        tendonSlackLength    0.062802257328805441
+        pennationAngle    0.27925268031900002
+    endmuscle
+
+        viapoint    TMAJ-P2
+            parent    scapula
+            muscle    TMAJ
+            musclegroup    scapula_to_humerus
+            position    -0.052460151361575523 -0.12352563723481808 -0.0028743064301876078
+        endviapoint
+
+    muscle    CORB
+        type    hilldegroote
+        musclegroup    scapula_to_humerus
+        OriginPosition    0.014459230859147092 -0.047995563924464135 -0.030841802823736733
+        InsertionPosition    0 -0.14130228698759759 -0.012871046790896921
+        optimalLength    0.092332930846792019
+        maximalForce    306.89999999999998
+        tendonSlackLength    0.068250904411991734
+        pennationAngle    0
+    endmuscle
+
+
+// thorax > humerus
+musclegroup thorax_to_humerus
+    OriginParent        thorax
+    InsertionParent        humerus
+endmusclegroup
+
+    muscle    PECM2
+        type    hilldegroote
+        musclegroup    thorax_to_humerus
+        OriginPosition    0.026220578235895811 -0.044280328106567624 0.016254018342614435
+        InsertionPosition    0.017662758194255383 -0.039184549660168128 0.0055196077838256599
+        optimalLength    0.16339979031091001
+        maximalForce    699.70000000000005
+        tendonSlackLength    0.11146199981922802
+        pennationAngle    0.43633231299899999
+    endmuscle
+
+        viapoint    PECM2-P2
+            parent    thorax
+            muscle    PECM2
+            musclegroup    thorax_to_humerus
+            position    0.044622859835791666 -0.040453794400214273 0.075203114541731578
+        endviapoint
+
+    muscle    PECM3
+        type    hilldegroote
+        musclegroup    thorax_to_humerus
+        OriginPosition    0.066067916812609775 -0.13750284270889881 0.020528920739065634
+        InsertionPosition    0.017662758194255383 -0.033117713133020317 0.0055196077838256599
+        optimalLength    0.19805160823199777
+        maximalForce    446.69999999999999
+        tendonSlackLength    0.10792884111043238
+        pennationAngle    0.43633231299899999
+    endmuscle
+
+        viapoint    PECM3-P2
+            parent    thorax
+            muscle    PECM3
+            musclegroup    thorax_to_humerus
+            position    0.045625661133069373 -0.086601423169310535 0.077083388403245134
+        endviapoint
+
+    muscle    LAT
+        type    hilldegroote
+        musclegroup    thorax_to_humerus
+        OriginPosition    -0.099861749435423877 -0.14982271512624173 0.00047659519778857909
+        InsertionPosition    0.010948173161704286 -0.024654633395472834 -0.0097388027319340771
+        optimalLength    0.23704154269406921
+        maximalForce    1129.7
+        tendonSlackLength    0.078775135034282642
+        pennationAngle    0.33161255787900001
+    endmuscle
+
+        viapoint    LAT-P2
+            parent    humerus
+            muscle    LAT
+            musclegroup    thorax_to_humerus
+            position    0.002231385929048417 -0.020853947865435419 -0.023695826104336619
+        endviapoint
+
+// scapula > radius
+musclegroup scapula_to_radius
+    OriginParent        scapula
+    InsertionParent        radius
+endmusclegroup
+
+    muscle    bic_l
+        type    hilldegroote
+        musclegroup    scapula_to_radius
+        OriginPosition    -0.013702376085930126 -0.025425134851441898 -0.022082388038304118
+        InsertionPosition    0.0010318655828611388 -0.042492766600996067 -0.0043419639296323198
+        optimalLength    0.15956813429147232
+        maximalForce    700
+        tendonSlackLength    0.28838358635494427
+        pennationAngle    0
+    endmuscle
+
+        viapoint    bic_l-P2
+            parent    humerus
+            muscle    bic_l
+            musclegroup    scapula_to_radius
+            position    0.016607516590119206 0.011071677726746139 0.016607516590119206
+        endviapoint
+
+    muscle    bic_b
+        type    hilldegroote
+        musclegroup    scapula_to_radius
+        OriginPosition    0.011908976862918686 -0.041470319554503234 -0.025151637384912443
+        InsertionPosition    0.0010318655828611388 -0.042492766600996067 -0.0043419639296323198
+        optimalLength    0.14535528221814145
+        maximalForce    894
+        tendonSlackLength    0.24059188532284115
+        pennationAngle    0
+    endmuscle
+
+
+// scapula > ulna
+musclegroup scapula_to_ulna
+    OriginParent        scapula
+    InsertionParent        ulna
+endmusclegroup
+
+    muscle    tric_long
+        type    hilldegroote
+        musclegroup    scapula_to_ulna
+        OriginPosition    -0.045850568449890314 -0.04558088518108297 -0.011973111312511683
+        InsertionPosition    -0.031400776063128792 -0.010305108359252161 -0.00094719389936596878
+        optimalLength    0.12961888698960281
+        maximalForce    2216
+        tendonSlackLength    0.25968205465440564
+        pennationAngle    0.17453293
+    endmuscle
+
+        viapoint    tric_long-P2
+            parent    humerus
+            muscle    tric_long
+            musclegroup    scapula_to_ulna
+            position    -0.025027527501309647 -0.31000697634889191 -0.016129995129764648
+        endviapoint
+
+// humerus > ulna
+musclegroup humerus_to_ulna
+    OriginParent        humerus
+    InsertionParent        ulna
+endmusclegroup
+
+    muscle    tric_lat
+        type    hilldegroote
+        musclegroup    humerus_to_ulna
+        OriginPosition    -0.0072178370719426163 -0.15238171488875246 0.0051573092735733459
+        InsertionPosition    -0.024871121623137267 0.011878985612060381 -0.00088581934734554982
+        optimalLength    0.095264400462957033
+        maximalForce    624.29999999999995
+        tendonSlackLength    0.11226407331497949
+        pennationAngle    0.17000000000000001
+    endmuscle
+
+        viapoint    tric_lat-P2
+            parent    humerus
+            muscle    tric_lat
+            musclegroup    humerus_to_ulna
+            position    -0.029426380045652536 -0.29609870748735539 -0.012664339016997778
+        endviapoint
+
+    muscle    tric_med
+        type    hilldegroote
+        musclegroup    humerus_to_ulna
+        OriginPosition    -0.010097713308802008 -0.16502114218160585 -0.010917094962325308
+        InsertionPosition    -0.024867361145839154 -0.0069180094617200998 -0.00088581936374689679
+        optimalLength    0.095250330539333544
+        maximalForce    624.29999999999995
+        tendonSlackLength    0.10410053546749462
+        pennationAngle    0.157
+    endmuscle
+
+        viapoint    tric_med-P2
+            parent    humerus
+            muscle    tric_med
+            musclegroup    humerus_to_ulna
+            position    -0.038366574109716126 -0.27277181698607195 -0.014664658582629796
+        endviapoint
+        viapoint    tric_med-P3
+            parent    humerus
+            muscle    tric_med
+            musclegroup    humerus_to_ulna
+            position    -0.033045184926275957 -0.30279449770995626 -0.014556155859684101
+        endviapoint

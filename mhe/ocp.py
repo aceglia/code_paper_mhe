@@ -158,7 +158,9 @@ def define_objective(
         )
         objectives.add(
             ObjectiveFcn.Lagrange.MINIMIZE_CONTROL,
-            weight=1000,
+            # weight=1000,
+            # tmhe = 0.09 :
+            weight=10000000,
             index=muscle_track_idx,
             key="muscles",
             multi_thread=False,
@@ -394,15 +396,28 @@ def configure_weights():
     weights : dict
         Dictionary of weights
     """
+    # weights = {
+    #     "track_markers": 10000000000000000,
+    #     "track_q": 100000000000000,
+    #     "min_control": 10000000,
+    #     "min_dq": 1000,
+    #     "min_q": 1,
+    #     "min_torque": 1000,
+    #     "track_emg": 1000000000,
+    #     "min_activation": 10,
+    # }
+
+    #tmhe 0.09
     weights = {
-        "track_markers": 10000000000000000,
+        "track_markers": 1000000000000000,
         "track_q": 100000000000000,
-        "min_control": 10000000,
-        "min_dq": 1000,
+        "min_control": 100000000000,
+        "min_dq": 10000000,
         "min_q": 1,
         "min_torque": 1000,
-        "track_emg": 1000000000,
+        "track_emg": 10000000000000,
         "min_activation": 10,
+
     }
     # tmhe 0.09
     # weights = {

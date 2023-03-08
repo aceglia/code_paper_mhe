@@ -110,7 +110,7 @@ def compute_force(
     """
     if frame_to_save >= sol.states["q"].shape[1] - 1 + slide_size:
         raise RuntimeError(
-            f"You can ask to save frame from 0 to {sol.states['q'].shape[1] + slide_size}." f"You asked{frame_to_save}."
+            f"You can ask to save frame from 0 to {sol.states['q'].shape[1] + slide_size}." f"You asked {frame_to_save}."
         )
     force_est = np.zeros((nbmt, slide_size))
     if not save_all_frame:
