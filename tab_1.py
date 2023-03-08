@@ -1,4 +1,4 @@
-from biosiglive.io.save_data import read_data
+from biosiglive.file_io.save_data import read_data
 import matplotlib.pyplot as plt
 import glob
 import numpy as np
@@ -14,19 +14,19 @@ process_std = []
 vicon_lat = []
 vicon_std = []
 for subject in subjects:
-    # files = glob.glob(f"{subject}/plot_**")
+    files = glob.glob(f"data/plot_**")
     # # files = [f"{subject}/plot_delay_full_test_tronc_plot"]
-    # for file in files:
-    #     data_tmp = read_data(file)
-    #     delay_tmp = data_tmp["plot_delay"]
-    #     plot_lat.append(np.median(delay_tmp))
-    #     plot_std.append(np.std(delay_tmp))
+    for file in files:
+        data_tmp = read_data(file)
+        delay_tmp = data_tmp["plot_delay"]
+        plot_lat.append(np.median(delay_tmp))
+        plot_std.append(np.std(delay_tmp))
 
     files = glob.glob(f"{subject}/C3D/data_**")
     # files = [f"{subject}/data_streaming_20220127-1820_compressed"]
     for file in files:
         data_tmp = read_data(file)
-        from biosiglive.io.save_data import add_data_to_pickle
+        from biosiglive.file_io.save_data import add_data_to_pickle
 
         # add_data_to_pickle(data_tmp, f"{file}_compressed")
         nan = list(zip(*map(list, np.where(np.isnan(data_tmp["kalman"])))))
@@ -44,13 +44,13 @@ for subject in subjects:
             vicon_lat.append([0])
             vicon_std.append([0])
 
-    files = glob.glob(f"{subject}/C3D/results_w4/data**")
+    files = glob.glob(f"results/data**")
 
     for file in files:
         data_tmp = read_data(file)
         sol_freq.append(np.mean(data_tmp["sol_freq"][1:]))
 
-plot_lat = np.round(np.mean(plot_lat), 2)
+plot_lat = np.round(np.mean(plot_lat), 3)
 plot_std = np.round(np.mean(plot_std), 2)
 total_plot_lat, total_plot_std = plot_lat * 1000, plot_std * 1000
 total_process_lat, total_process_std = (

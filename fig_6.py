@@ -136,7 +136,6 @@ if __name__ == "__main__":
     axs.resize(4, 1)
     fig.delaxes(axs[-1][0])
 
-
     for i in range(3):
         ax = axs[i][0]
         ax.set_title(fig_names[i])

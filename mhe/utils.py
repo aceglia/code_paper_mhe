@@ -4,7 +4,7 @@ This code provides some utility functions for the mhe implementation.
 
 import numpy as np
 import bioptim
-from biosiglive.io.save_data import add_data_to_pickle, read_data
+from biosiglive.file_io.save_data import add_data_to_pickle, read_data
 from biosiglive.interfaces.client_interface import TcpClient
 from biosiglive.streaming.client import Client
 from biosiglive.gui.plot import LivePlot

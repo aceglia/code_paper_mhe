@@ -17,7 +17,7 @@ except ModuleNotFoundError:
 import C3DtoTRC
 import csv
 from biosiglive.processing.msk_functions import kalman_func
-from biosiglive.io.save_data import read_data
+from biosiglive.file_io.save_data import read_data
 from osim_to_biomod import Converter
 
 
@@ -84,7 +84,7 @@ def initialize(
         Mass of the subject. The default is None.
     """
     mat = read_data(f"{data_dir}/{trial}")
-    markers = mat["markers"][:3, :, :50]
+    markers = mat["markers"][:3, 4:, :]
 
     # Define the name of the model's markers
     marker_names = [
@@ -117,7 +117,7 @@ def initialize(
         trc_file = f"{data_dir}/{trial}.trc"
         C3DtoTRC.WriteTrcFromMarkersData(
             trc_file,
-            markers=markers[:3, :, :-1],
+            markers=markers[:3, :, :],
             marker_names=marker_names,
             data_rate=100,
             cam_rate=100,
@@ -154,7 +154,7 @@ def initialize(
         q_recons, _ = kalman_func(markers, model=bmodel, use_kalman=True)
         q_mean = q_recons.mean(axis=1)
         print(q_mean[3], q_mean[4], q_mean[5], " xyz ", q_mean[0], q_mean[1], q_mean[2])
-        b = bioviz.Viz(model_path=model_path)
+        b = bioviz.Viz(model_path=model_path, show_floor=False)
         b.load_movement(q_recons)  # Q from kalman array(nq, nframes)
         b.load_experimental_markers(markers)  # experimental markers array(3, nmarkers, nframes)
         b.exec()

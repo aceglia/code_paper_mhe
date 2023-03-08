@@ -111,8 +111,8 @@ if __name__ == "__main__":
                 #     label=labels[k],
                 #     color=color[k],
                 # )
-                axs.flat[0].set_xticklabels([])
-                axs.flat[1].set_xticklabels([])
+                # axs.flat[0].set_xticklabels([])
+                # axs.flat[1].set_xticklabels([])
                 if b - 1 in [0, 3, 6]:
                     axs.flat[0].set_ylabel("Activations\n (% MVC)\n", fontsize=12)
                     axs.flat[1].set_ylabel("Force\n (% BW)\n", fontsize=12)

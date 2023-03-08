@@ -2,7 +2,7 @@ import numpy as np
 from biosiglive.processing.data_processing import OfflineProcessing
 import math
 import biorbd
-from biosiglive.io.save_data import add_data_to_pickle, read_data
+from biosiglive.file_io.save_and_load import save, load
 
 
 # --- RMSE --- #
@@ -101,7 +101,7 @@ if __name__ == "__main__":
             result_dic_tmp = {}
             for f, frame in enumerate(n_frames):
                 file = f"{trial}_result_duration_{cond}_{frame}"
-                result_mat = read_data(file)
+                result_mat = load(file)
                 nb_mhe = int(result_mat["Nmhe"][0] + 1)
                 rmse_markers = []
                 rmse_torque = []
@@ -176,4 +176,4 @@ if __name__ == "__main__":
             result_dic[f"{cond}"] = result_dic_tmp
         result_all_dic[f"{trial}"] = result_dic
         dic_to_save = {f"{trial}": result_all_dic[f"{trial}"]}
-        add_data_to_pickle(dic_to_save, "result_all_trials")
+        save(dic_to_save, "result_all_trials")

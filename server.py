@@ -23,12 +23,12 @@ import numpy as np
 import multiprocessing as mp
 import os
 from biosiglive.streaming.connection import Server
-from biosiglive.io import save_data
+from biosiglive.file_io import save_data
 from biosiglive.interfaces import pytrigno_interface, vicon_interface
 from biosiglive.processing.data_processing import RealTimeProcessing
 from biosiglive.processing.msk_functions import kalman_func
 from biosiglive.gui.plot import LivePlot
-from biosiglive.io.save_data import read_data
+from biosiglive.file_io.save_data import read_data
 
 vicon_package, biorbd_package = True, True
 

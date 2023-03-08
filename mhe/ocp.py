@@ -5,10 +5,9 @@ import bioptim
 from .utils import *
 from time import time, sleep
 import biorbd_casadi as biorbd
-from biosiglive.io.save_data import read_data
+from biosiglive.file_io.save_and_load import load
 import numpy as np
 import datetime
-import scipy.io as sio
 from casadi import MX, Function, horzcat
 from bioptim import (
     MovingHorizonEstimator,
@@ -160,8 +159,6 @@ def define_objective(
         objectives.add(
             ObjectiveFcn.Lagrange.MINIMIZE_CONTROL,
             weight=1000,
-            # tmhe = 0.09 :
-            # weight=10000000,
             index=muscle_track_idx,
             key="muscles",
             multi_thread=False,
