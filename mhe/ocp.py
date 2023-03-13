@@ -8,7 +8,8 @@ import biorbd_casadi as biorbd
 from biosiglive.file_io.save_and_load import load
 import numpy as np
 import datetime
-from casadi import MX, Function, horzcat
+import scipy.io as sio
+from casadi import MX, Function, horzcat, vertcat
 from bioptim import (
     MovingHorizonEstimator,
     ObjectiveList,
@@ -158,9 +159,9 @@ def define_objective(
         )
         objectives.add(
             ObjectiveFcn.Lagrange.MINIMIZE_CONTROL,
-            # weight=1000,
+            weight=100000,
             # tmhe = 0.09 :
-            weight=10000000,
+            # weight=100000000,
             index=muscle_track_idx,
             key="muscles",
             multi_thread=False,
@@ -321,6 +322,7 @@ def prepare_problem(
     dynamics.add(
         DynamicsFcn.MUSCLE_DRIVEN,
         dynamic_function=custom_muscles_driven,
+        # dynamic_function=custom_dynamic,
         with_excitations=False,
         with_torque=use_torque,
         expand=False,
@@ -396,38 +398,27 @@ def configure_weights():
     weights : dict
         Dictionary of weights
     """
-    # weights = {
-    #     "track_markers": 10000000000000000,
-    #     "track_q": 100000000000000,
-    #     "min_control": 10000000,
-    #     "min_dq": 1000,
-    #     "min_q": 1,
-    #     "min_torque": 1000,
-    #     "track_emg": 1000000000,
-    #     "min_activation": 10,
-    # }
-
-    #tmhe 0.09
     weights = {
-        "track_markers": 1000000000000000,
+        "track_markers": 10000000000000000,
         "track_q": 100000000000000,
-        "min_control": 100000000000,
-        "min_dq": 10000000,
+        "min_control": 100000000,
+        "min_dq": 10000,
         "min_q": 1,
         "min_torque": 1000,
-        "track_emg": 10000000000000,
+        "track_emg": 1000000000,
         "min_activation": 10,
-
     }
+
     # tmhe 0.09
     # weights = {
     #     "track_markers": 1000000000000000,
     #     "track_q": 100000000000000,
-    #     "min_control": 100000000000,
+    #     "min_control": 120000000000,
     #     "min_dq": 10000000,
     #     "min_q": 1,
     #     "min_torque": 1000,
-    #     "track_emg": 10000000000000,
+    #     # "track_emg": 10000000000000,
+    #     "track_emg": 3800000000000,
     #     "min_activation": 10,
     #
     # }
@@ -873,7 +864,7 @@ class CustomMhe(MovingHorizonEstimator):
         _controls = InitialGuess(np.concatenate(controls, axis=1), interpolation=InterpolationType.EACH_FRAME)
 
         solution_ocp = OptimalControlProgram(
-            biorbd_model=self.original_values["biorbd_model"][0],
+            bio_model=self.original_values["biorbd_model"][0],
             dynamics=self.original_values["dynamics"][0],
             n_shooting=(self.total_optimization_run * 1) - 1,
             phase_time=self.total_optimization_run * self.nlp[0].dt,

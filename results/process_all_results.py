@@ -3,6 +3,24 @@ from biosiglive.processing.data_processing import OfflineProcessing
 import math
 import biorbd
 from biosiglive.file_io.save_and_load import save, load
+from scipy import signal
+import csv
+from pathlib import Path
+import os
+import shutil
+# import opensim as osim
+# import pyosim
+
+
+def meanfreq(x, fs):
+    f, Pxx_den = signal.periodogram(x, fs, detrend=False)
+    Pxx_den = np.reshape( Pxx_den, (1,-1) )
+    width = np.tile(f[1]-f[0], (1, Pxx_den.shape[1]))
+    f = np.reshape(f, (1, -1))
+    P = Pxx_den * width
+    pwr = np.sum(P)
+    mnfreq = np.dot(P, f.T)/pwr
+    return mnfreq
 
 
 # --- RMSE --- #
@@ -29,6 +47,15 @@ def get_muscular_torque(x, act, model):
     return muscular_torque
 
 
+def get_muscle_moment_arm(x, model):
+    moment_arm = np.zeros((model.nbMuscles(), model.nbQ(), x.shape[1]))
+    for i in range(x.shape[1]):
+        moment_arm_tmp = model.musclesLengthJacobian(x[:model.nbQ(), i]).to_array()
+        for m in range(model.nbMuscles()):
+            moment_arm[m, :, i] = moment_arm_tmp[m]
+    return moment_arm
+
+
 def finite_difference(data, f):
     t = np.linspace(0, data.shape[0] / f, data.shape[0])
     y = data
@@ -43,7 +70,7 @@ def get_id_torque(x, model, f=33):
     for i in range(q.shape[0]):
         qdot[i, :] = finite_difference(q[i, :], f)
         qddot[i, :] = finite_difference(qdot[i, :], f)
-    qddot = OfflineProcessing().butter_lowpass_filter(qddot, 2, f, 4)
+    qddot = OfflineProcessing(data_rate=33, processing_window=2000).butter_lowpass_filter(qddot, 2, f, 4)
 
     tau_from_b = np.zeros((model.nbQ(), q.shape[1]))
     for i in range(q.shape[1]):
@@ -89,6 +116,7 @@ if __name__ == "__main__":
     muscle_torque = []
     id_torque = []
     n_frames = [0, 25, 50, 75, 100]
+    # n_frames = [75]
     result_all_dic = {}
     n_init = [int(0)] * len(conditions)
     for trial in trials:
@@ -101,7 +129,7 @@ if __name__ == "__main__":
             result_dic_tmp = {}
             for f, frame in enumerate(n_frames):
                 file = f"{trial}_result_duration_{cond}"
-                result_mat = read_data("results_w6_freq/" + file)
+                result_mat = load("results_w6_freq_calc/" + file)
                 nb_mhe = int(result_mat["Nmhe"][0] + 1)
                 rmse_markers = []
                 rmse_torque = []
@@ -111,6 +139,8 @@ if __name__ == "__main__":
                 result_mat["phase_emg_err"] = 0
                 result_mat["magnitude_emg_std"] = 0
                 result_mat["phase_emg_std"] = 0
+                result_mat["emg_std"] = 0
+                result_mat["emg_rmse"] = 0
                 nb_iter = len(result_mat["time"]) - n_init[c] - 1
                 exp_freq = result_mat["exp_freq"][0]
                 result_mat["U_est"] = result_mat["U_est"].clip(min=0.00000000000001)
@@ -127,6 +157,10 @@ if __name__ == "__main__":
                     result_mat["U_est"][:, n_frame::nb_mhe][:, n_init[c] :],
                     model,
                 )
+                result_mat["muscle_moment_arm"] = get_muscle_moment_arm(
+                    result_mat["X_est"][:, n_frame::nb_mhe][:, n_init[c]:],
+                    model,
+                )
                 result_mat["tau_est"] = result_mat["tau_est"][:, n_frame::nb_mhe][:, n_init[c] :]
                 result_mat["est_tau_tot"] = result_mat["muscle_torque"] + result_mat["tau_est"]
                 result_mat["X_est"] = result_mat["X_est"][:, n_frame::nb_mhe][:, n_init[c] :]
@@ -135,6 +169,11 @@ if __name__ == "__main__":
                 result_mat["muscles_target"] = result_mat["muscles_target"][:, n_frame::nb_mhe][:, n_init[c] :]
                 result_mat["kin_target"] = result_mat["kin_target"][:, :, n_frame::nb_mhe][:, :, n_init[c] :]
                 result_mat["sol_freq_mean"] = np.mean(result_mat["sol_freq"])
+                rmse_emg = []
+                std_emg = []
+                for i in range(16):
+                    rmse_emg.append(np.sqrt(np.mean((result_mat["U_est"][muscle_track_idx[i], :] - result_mat["muscles_target"][i]) ** 2)))
+                    std_emg.append(np.sqrt(np.std(result_mat["U_est"][muscle_track_idx[i], :] - result_mat["muscles_target"][i])**2))
                 markers = np.ndarray((3, model.nbMarkers(), result_mat["X_est"].shape[1]))
                 for i in range(result_mat["X_est"].shape[1]):
                     markers[:, :, i] = np.array(
@@ -147,10 +186,66 @@ if __name__ == "__main__":
                     std_torque.append(
                         np.sqrt(np.std((result_mat["est_tau_tot"][i, :] - result_mat["ID_torque"][i, :]) ** 2))
                     )
-                result_mat["saturation"] = np.where(result_mat["U_est"] > 0.95)[0].shape[0] * 100 / (result_mat["U_est"].shape[1]*result_mat["U_est"].shape[0])
-                result_mat["gradient"] = np.sum(np.abs(np.gradient(result_mat["U_est"])))
+                result_mat["saturation"] = np.where(result_mat["U_est"] > 0.85)[0].shape[0] * 100 / (result_mat["U_est"].shape[1]*result_mat["U_est"].shape[0])
+                var = ["q", "qdot", "U_est", "tau_est","tau_ref", "markers", "kalman", "kalman_dot", "x", "kalman_tot"]
+                mnfreq = []
+                for v in var:
+                    if v == "q":
+                        mnfreq = []
+                        for j in range(int(result_mat["X_est"].shape[0]/2)):
+                            mnfreq.append(meanfreq(result_mat["X_est"][j, :],
+                                                   result_mat["sol_freq_mean"]))
+                    elif v == "kalman":
+                        mnfreq = []
+                        for j in range(int(result_mat["kalman"].shape[0] / 2)):
+                            mnfreq.append(meanfreq(result_mat["kalman"][j, :],
+                                                   result_mat["sol_freq_mean"]))
+                    elif v == "kalman_dot":
+                        mnfreq = []
+                        for j in range(int(result_mat["kalman"].shape[0] / 2)):
+                            mnfreq.append(meanfreq(result_mat["kalman"][j + 10, :],
+                                                   result_mat["sol_freq_mean"]))
+                    elif v == "qdot":
+                        mnfreq = []
+                        for j in range(int(result_mat["X_est"].shape[0] / 2)):
+                            mnfreq.append(meanfreq(result_mat["X_est"][j + 10, :],
+                                                   result_mat["sol_freq_mean"]))
+                    elif v == "U_est":
+                        mnfreq = []
+                        for j in range(int(result_mat["U_est"].shape[0])):
+                            mnfreq.append(meanfreq(result_mat["U_est"][j, :],
+                                                   result_mat["sol_freq_mean"]))
+                    elif v == "tau_est":
+                        mnfreq = []
+                        for j in range(int(result_mat["est_tau_tot"].shape[0])):
+                            mnfreq.append(meanfreq(result_mat["est_tau_tot"][j, :],
+                                                   result_mat["sol_freq_mean"]))
+                    elif v == "markers":
+                        mnfreq = []
+                        for j in range(int(result_mat["kin_target"].shape[0])):
+                            mnfreq.append(meanfreq(result_mat["kin_target"][0, j, :]*1000,
+                                                   result_mat["sol_freq_mean"]))
+                    elif v == "tau_ref":
+                        mnfreq = []
+                        for j in range(int(result_mat["ID_torque"].shape[0])):
+                            mnfreq.append(meanfreq(result_mat["ID_torque"][j, :],
+                                                   result_mat["sol_freq_mean"]))
+                    elif v == "x":
+                        mnfreq = []
+                        for j in range(int(result_mat["X_est"].shape[0])):
+                            mnfreq.append(meanfreq(result_mat["X_est"][j, :],
+                                                   result_mat["sol_freq_mean"]))
+                    elif v == "kalman_tot":
+                        mnfreq = []
+                        for j in range(int(result_mat["kalman"].shape[0])):
+                            mnfreq.append(meanfreq(result_mat["kalman"][j, :],
+                                                   result_mat["sol_freq_mean"]))
+
+                    result_mat[f"mean_freq_{v}"] = np.mean(mnfreq)
                 result_mat["rmse_torque"] = np.mean(rmse_torque)
                 result_mat["std_torque"] = np.mean(std_torque)
+                result_mat["rmse_emg"] = np.mean(rmse_emg)
+                result_mat["std_emg"] = np.mean(std_emg)
                 for m in range(model.nbMuscles()):
                     if m in muscle_track_idx:
                         idx = muscle_track_idx.index(m)
@@ -179,4 +274,4 @@ if __name__ == "__main__":
             result_dic[f"{cond}"] = result_dic_tmp
         result_all_dic[f"{trial}"] = result_dic
         dic_to_save = {f"{trial}": result_all_dic[f"{trial}"]}
-        add_data_to_pickle(dic_to_save, "result_all_trials")
+        save(dic_to_save, "results_all_trials_w6_freq_calc.bio")

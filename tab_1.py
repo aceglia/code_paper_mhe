@@ -1,4 +1,4 @@
-from biosiglive.file_io.save_data import read_data
+from biosiglive.file_io.save_and_load import load
 import matplotlib.pyplot as plt
 import glob
 import numpy as np
@@ -12,23 +12,17 @@ process_lat = []
 process_std = []
 vicon_lat = []
 vicon_std = []
-for subject in subjects:
-    files = glob.glob(f"data/plot_**")
-    # # files = [f"{subject}/plot_delay_full_test_tronc_plot"]
-    for file in files:
-        data_tmp = read_data(file)
-        delay_tmp = data_tmp["plot_delay"]
-        plot_lat.append(np.median(delay_tmp))
-        plot_std.append(np.std(delay_tmp))
+files = glob.glob(f"data/plot_**")
+for file in files:
+    data_tmp = load(file)
+    delay_tmp = data_tmp["plot_delay"]
+    plot_lat.append(np.median(delay_tmp))
+    plot_std.append(np.std(delay_tmp))
 
-files = glob.glob(f"/home/amedeoceglia/Documents/programmation/code_paper_mhe_data/data_final_new/subject_3/C3D/data_c3d/data_**")
-# files = [f"{subject}/data_streaming_20220127-1820_compressed"]
+files = glob.glob(f"data/data_**")
 for file in files:
     try:
-        data_tmp = read_data(file)
-        from biosiglive.file_io.save_data import add_data_to_pickle
-
-        # add_data_to_pickle(data_tmp, f"{file}_compressed")
+        data_tmp = load(file)
         nan = list(zip(*map(list, np.where(np.isnan(data_tmp["kalman"])))))
         delay_tmp = data_tmp["process_delay"]
         if nan:
@@ -46,22 +40,20 @@ for file in files:
     except:
         pass
 
-    files = glob.glob(f"results/data**")
+files = glob.glob(f"results/results_all_trials_w6_freq_calc")
+for file in files:
+    data_tmp = load(file)
+    for key in data_tmp.keys():
+        sol_freq.append(np.mean(data_tmp[key][0]["0.08"]["75"]["sol_freq"][1:]))
 
-    for file in files:
-        data_tmp = read_data(file)
-        sol_freq.append(np.mean(data_tmp["sol_freq"][1:]))
-    except:
-        pass
-
-plot_lat = np.round(np.mean(plot_lat), 3)
-plot_std = np.round(np.mean(plot_std), 2)
+plot_lat = np.round(np.mean(plot_lat), 5)
+plot_std = np.round(np.mean(plot_std), 5)
 total_plot_lat, total_plot_std = plot_lat * 1000, plot_std * 1000
 total_process_lat, total_process_std = (
-    np.round(np.mean(process_lat) * 1000, 2),
-    np.round(np.mean(process_std) * 1000, 2),
+    np.round(np.mean(process_lat) * 1000, 5),
+    np.round(np.mean(process_std) * 1000, 5),
 )
-total_vicon_lat, total_vicon_std = np.round(vicon_lat[0] * 1000, 2), np.round(vicon_std[0] * 1000, 2)
+total_vicon_lat, total_vicon_std = np.round(vicon_lat[0] * 1000, 5), np.round(vicon_std[0] * 1000, 5)
 
 print(f"Plot latency : {total_plot_lat} ms +/- {total_plot_std} ms")
 print("TCP/IP latency: 6.1 ms")
@@ -72,15 +64,16 @@ n_round = 2
 
 print(f"Solve frequency: {np.mean([i for i in sol_freq])} Hz +/- {np.std(sol_freq)}")
 print(f"Solve duration: {1/np.mean(sol_freq)*1000} ms +/- {np.std([1/i for i in sol_freq])*1000}")
+print(f"frame_saved: {1/np.mean(sol_freq)*1000*0.75} ms +/- {np.std([1/i for i in sol_freq])*1000*0.75}")
 
-# print(
-#     f"\hline computer 1 & Nexus & ${total_vicon_lat}$ & ${total_vicon_std}$\ \ \n "
-#     f"& Processing & ${total_process_lat}$ & ${total_process_std}$\ \ \n"
-#     f"& TCP/IP & ${6.1}$ & ${1.2}$\ \ \n"
-#     f"\hline"
-#     f"computer 2 & Estimator & ${np.round(1/np.mean(sol_freq)*1000,n_round)}$ & ${np.std([1/i for i in sol_freq]) *1000}$\ \ \n "
-#     f"& Vizualisation & ${total_plot_lat}$ & ${total_plot_std}$\ \ \n"
-#     f"\hline"
-#     f"& Total & ${total_process_lat+total_vicon_lat+total_plot_lat+1/np.mean(sol_freq)*1000+6.1}$ &"
-#     f" ${total_process_std+total_vicon_std+total_plot_std + np.std([1/i for i in sol_freq]) *1000+1.2 }$\ \ \n"
-# )
+print(
+    f"\hline computer 1 & Nexus & ${total_vicon_lat}$ & ${total_vicon_std}$\ \ \n "
+    f"& Processing & ${total_process_lat}$ & ${total_process_std}$\ \ \n"
+    f"& TCP/IP & ${6.1}$ & ${1.2}$\ \ \n"
+    f"\hline"
+    f"computer 2 & Estimator & ${np.round(1/np.mean(sol_freq)*1000,n_round)}$ & ${np.std([1/i for i in sol_freq]) *1000}$\ \ \n "
+    f"& Vizualisation & ${total_plot_lat}$ & ${total_plot_std}$\ \ \n"
+    f"\hline"
+    f"& Total & ${total_process_lat+total_vicon_lat+total_plot_lat+1/np.mean(sol_freq)*1000+6.1+1/np.mean(sol_freq)*1000*0.75}$ &"
+    f" ${total_process_std+total_vicon_std+total_plot_std + np.std([1/i for i in sol_freq]) *1000+1.2 +np.std([1/i for i in sol_freq])*1000*0.75}$\ \ \n"
+)

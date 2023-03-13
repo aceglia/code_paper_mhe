@@ -22,8 +22,8 @@ import scipy.io as sio
 import numpy as np
 import multiprocessing as mp
 import os
-from biosiglive.streaming.connection import Server
-from biosiglive.file_io import save_data
+from biosiglive.streaming.server import Server
+from biosiglive.io import save_data
 from biosiglive.interfaces import pytrigno_interface, vicon_interface
 from biosiglive.processing.data_processing import RealTimeProcessing
 from biosiglive.processing.msk_functions import kalman_func

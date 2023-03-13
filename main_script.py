@@ -314,17 +314,19 @@ class MuscleForceEstimator:
 
 if __name__ == "__main__":
     data_dir = f"/home/amedeoceglia/Documents/programmation/code_paper_mhe_data/data_final_new/subject_3/C3D/"
-    result_dir = "results/results_passive_torque/"
+    result_dir = "results/results_w9/"
     trials = [
         "data_abd_sans_poid",
         "data_abd_poid_2kg",
-        "data_cycl_poid_2kg",
-        "data_flex_poid_2kg",
-        "data_flex_sans_poid",
-        "data_cycl_sans_poid",
+        # "data_cycl_poid_2kg",
+        # "data_flex_poid_2kg",
+        # "data_flex_sans_poid",
+        # "data_cycl_sans_poid",
     ]
-    configs = [0.04, 0.05, 0.06, 0.07, 0.08, 0.09, 0.1, 0.11, 0.12]#, 0.08, 0.1, 1.2, 1.5]  # , "mhe"]
-    exp_freq = [48, 45, 41, 39, 34, 31, 29, 29, 23]
+    # configs = [0.04, 0.05, 0.06, 0.07, 0.08, 0.09, 0.1, 0.11, 0.12]
+    # exp_freq = [43, 38, 37, 34, 29, 27, 25, 24, 22]
+    configs = [0.07]
+    exp_freq = [30]
     for c, config in enumerate(configs):
         for trial in trials:
             offline_path = data_dir + f"{trial}"
@@ -337,9 +339,9 @@ if __name__ == "__main__":
                 "qp_solver_iter_max": 500,
             }
             if "2k" in trial:
-                model = data_dir + f"wu_scaled_2kg.bioMod"
+                model = f"data/wu_scaled_2kg.bioMod"
             else:
-                model = data_dir + f"wu_scaled.bioMod"
+                model = f"data/wu_scaled.bioMod"
 
             configuration_dic = {
                 "model_path": model,

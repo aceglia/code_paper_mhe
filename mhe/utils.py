@@ -4,10 +4,8 @@ This code provides some utility functions for the mhe implementation.
 
 import numpy as np
 import bioptim
-from biosiglive.file_io.save_data import add_data_to_pickle, read_data
-from biosiglive.interfaces.client_interface import TcpClient
+from biosiglive.file_io.save_and_load import save, load
 from biosiglive.streaming.client import Client
-from biosiglive.gui.plot import LivePlot
 from time import strftime
 import datetime
 from scipy.interpolate import interp1d
@@ -168,7 +166,7 @@ def save_results(
     if not os.path.isdir(f"results/"):
         os.mkdir(f"results/")
     data_path = f"{result_dir}/{file_name}"
-    add_data_to_pickle(data, data_path)
+    save(data, data_path)
 
 
 def muscle_mapping(muscles_target_tmp: np.ndarray, muscle_track_idx: list, mvc_list=None):
@@ -254,19 +252,20 @@ def interpolate_data(interp_factor: int, x_ref: np.ndarray, muscles_target: np.n
 def get_data(ip=None, port=None, message=None, offline=False, offline_file_path=None):
     if offline:
         nfinal = -400
+        n_init = 100
         if offline_file_path[-4:] == ".mat":
             mat = sio.loadmat(offline_file_path)
             x_ref, markers, muscles = mat["kalman"], mat["markers"], mat["emg_proc"]
 
         else:
-            mat = read_data(offline_file_path)
+            mat = load(offline_file_path)
             try:
                 x_ref, markers, muscles = mat["kalman"], mat["kin_target"], mat["muscles_target"]
             except:
                 x_ref, markers, muscles = (
-                    mat["kalman"][:, 100:nfinal],
-                    mat["markers"][:, 4:, 100:nfinal],
-                    mat["emg_proc"][:, 100:nfinal],
+                    mat["kalman"][:, n_init:nfinal],
+                    mat["markers"][:, 4:, n_init:nfinal],
+                    mat["emg_proc"][:, n_init:nfinal],
                 )
         return x_ref, markers, muscles
     else:
