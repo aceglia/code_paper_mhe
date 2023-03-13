@@ -16,8 +16,9 @@ except ModuleNotFoundError:
 
 import C3DtoTRC
 import csv
-from biosiglive.processing.msk_functions import kalman_func
-from biosiglive.io.save_data import read_data
+from biosiglive.processing.msk_functions import MskFunctions
+from biosiglive.file_io.save_and_load import load
+from biosiglive import InverseKinematicsMethods
 from osim_to_biomod import Converter
 
 
@@ -83,8 +84,8 @@ def initialize(
     mass : int, optional
         Mass of the subject. The default is None.
     """
-    mat = read_data(f"{data_dir}/{trial}")
-    markers = mat["markers"][:3, :, :50]
+    mat = load(f"{data_dir}/{trial}")
+    markers = mat["markers"][:3, :, :]
 
     # Define the name of the model's markers
     marker_names = [
@@ -149,12 +150,11 @@ def initialize(
         )
 
     else:
-        model_path = biomod_model
-        bmodel = biorbd.Model(model_path)
-        q_recons, _ = kalman_func(markers, model=bmodel, use_kalman=True)
+        funct = MskFunctions(model=biomod_model)
+        q_recons, _ = funct.compute_inverse_kinematics(markers, method=InverseKinematicsMethods.BiorbdKalman)
         q_mean = q_recons.mean(axis=1)
         print(q_mean[3], q_mean[4], q_mean[5], " xyz ", q_mean[0], q_mean[1], q_mean[2])
-        b = bioviz.Viz(model_path=model_path)
+        b = bioviz.Viz(model_path=biomod_model, show_floor=False)
         b.load_movement(q_recons)  # Q from kalman array(nq, nframes)
         b.load_experimental_markers(markers)  # experimental markers array(3, nmarkers, nframes)
         b.exec()
@@ -189,7 +189,7 @@ if __name__ == "__main__":
     bio_model = "data/wu_scaled.bioMod"
     mass = 72
     mass_scaling = mass * 0.578 + mass * 0.050
-    data_dir = f"data"
+    data_dir = f"/home/amedeoceglia/Documents/programmation/code_paper_mhe_data/data_final_new/subject_3/C3D/"
     osim_model = f"{data_dir}/wu.osim"
     initialize(
         osim_model=osim_model, biomod_model=bio_model, data_dir=data_dir, scaling=False, mass=mass_scaling, trial=trial

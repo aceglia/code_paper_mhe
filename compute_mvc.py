@@ -6,7 +6,7 @@ This file is part of biosiglive. it is an example to see how to use biosiglive t
 from time import strftime
 from biosiglive.interfaces.vicon_interface import ViconClient
 from biosiglive.interfaces.pytrigno_interface import PytrignoClient
-from biosiglive.interfaces.client_interface import TcpClient
+from biosiglive.interfaces.tcp_interface import TcpClient
 from biosiglive.processing.data_processing import OfflineProcessing
 from biosiglive.gui.plot import LivePlot, Plot
 from time import time, sleep
