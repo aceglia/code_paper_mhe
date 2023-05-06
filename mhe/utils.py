@@ -122,7 +122,7 @@ def compute_force(
     u_est = a_est
     for i in range(nbmt):
         for j in range(slide_size):
-            force_est[i, j] = get_force(q_est[:, j], dq_est[:, j], a_est[:, j], u_est[:, j])[i, :]
+            force_est[i, j] = get_force(q_est[:, j], dq_est[:, j], a_est[:, j])[i, :]
     return q_est, dq_est, a_est, u_est, force_est
 
 

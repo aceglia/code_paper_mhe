@@ -26,7 +26,7 @@ class MuscleForceEstimator:
         """
         conf = check_and_adjust_dim(*args)
         self.model_path = conf["model_path"]
-        biorbd_model = biorbd.Model(self.model_path)
+        biorbd_model = BiorbdModel(self.model_path)
         self.use_torque = False
         self.save_results = True
         self.track_emg = False
@@ -90,8 +90,8 @@ class MuscleForceEstimator:
         self.T_mhe = self.mhe_time
         self.ns_mhe = int(self.T_mhe * self.markers_rate * self.interpol_factor)
         self.slide_size = int(((self.markers_rate * self.interpol_factor) / self.exp_freq))
-        self.nbQ, self.nbMT = biorbd_model.nbQ(), biorbd_model.nbMuscles()
-        self.nbGT = biorbd_model.nbGeneralizedTorque() if self.use_torque else 0
+        self.nbQ, self.nbMT = biorbd_model.nb_q, biorbd_model.nb_muscles
+        self.nbGT = biorbd_model.nb_tau if self.use_torque else 0
         self.current_time = strftime("%Y%m%d-%H%M")
         self.data_to_get = []
         self.data_to_get.append("markers")
@@ -101,18 +101,18 @@ class MuscleForceEstimator:
         self.EMG_ratio = 1
         self.rt_ratio = self.markers_ratio
         self.muscle_names = []
-        for i in range(biorbd_model.nbMuscles()):
-            self.muscle_names.append(biorbd_model.muscleNames()[i].to_string())
+        for i in range(biorbd_model.nb_muscles):
+            self.muscle_names.append(biorbd_model.muscle_names[i])
         self.dof_names = []
-        for i in range(biorbd_model.nbQ()):
-            self.dof_names.append(biorbd_model.nameDof()[i].to_string())
+        for i in range(biorbd_model.nb_q):
+            self.dof_names.append(biorbd_model.name_dof[i])
 
     def prepare_problem_init(self):
         """
         Prepare the mhe problem.
         """
 
-        biorbd_model = biorbd.Model(self.model_path)
+        biorbd_model = BiorbdModel(self.model_path)
         self.data_to_get = []
         self.data_to_get.append("markers")
         self.data_to_get.append("emg")
@@ -149,20 +149,20 @@ class MuscleForceEstimator:
             else self.x_ref[: self.nbQ, : window_len + 1]
         )
 
-        for i in range(biorbd_model.nbMuscles()):
-            self.muscle_names.append(biorbd_model.muscleNames()[i].to_string())
-        if self.x_ref.shape[0] != biorbd_model.nbQ() * 2:
+        for i in range(biorbd_model.nb_muscles):
+            self.muscle_names.append(biorbd_model.muscle_names[i])
+        if self.x_ref.shape[0] != biorbd_model.nb_q * 2:
             previous_sol = np.concatenate(
                 (self.x_ref[:, : window_len + 1], np.zeros((self.x_ref.shape[0], window_len + 1)))
             )
         else:
             previous_sol = self.x_ref[:, : window_len + 1]
-        muscle_init = np.ones((biorbd_model.nbMuscles(), self.ns_mhe)) * 0.1
+        muscle_init = np.ones((biorbd_model.nb_muscles, self.ns_mhe)) * 0.1
         count = 0
         for i in self.muscle_track_idx:
             muscle_init[i, :] = self.muscles_target[count, : self.ns_mhe]
             count += 1
-        u0 = np.concatenate((muscle_init, np.zeros((biorbd_model.nbQ(), self.ns_mhe))))
+        u0 = np.concatenate((muscle_init, np.zeros((biorbd_model.nb_q, self.ns_mhe))))
         objectives = define_objective(
             weights=self.weights,
             use_torque=self.use_torque,
@@ -188,7 +188,7 @@ class MuscleForceEstimator:
             use_acados=True,
         )
         self.get_force = force_func(biorbd_model)
-        self.force_est = np.ndarray((biorbd_model.nbMuscles(), 1))
+        self.force_est = np.ndarray((biorbd_model.nb_muscles, 1))
 
     def run(
         self,
@@ -301,7 +301,7 @@ class MuscleForceEstimator:
             else:
                 raise RuntimeError(f"{key} is not a variable of the class")
 
-        self.model = biorbd.Model(self.model_path)
+        self.model = BiorbdModel(self.model_path)
         initial_time = time()
         sol = self.mhe.solve(
             lambda mhe, i, sol: update_mhe(
@@ -313,7 +313,7 @@ class MuscleForceEstimator:
 
 
 if __name__ == "__main__":
-    data_dir = f"/home/amedeoceglia/Documents/programmation/code_paper_mhe_data/data_final_new/subject_3/C3D/"
+    data_dir = f"/home/amedeo/Documents/programmation/code_paper_mhe/data/data_final_new/subject_3/C3D/"
     result_dir = "results/results_w9/"
     trials = [
         "data_abd_sans_poid",
@@ -330,7 +330,7 @@ if __name__ == "__main__":
     for c, config in enumerate(configs):
         for trial in trials:
             offline_path = data_dir + f"{trial}"
-            file_name = f"{trial}_result_duration_{config}"
+            file_name = f"{trial}_result_duration_{config}_test"
 
             solver_options = {
                 "sim_method_jac_reuse": 1,

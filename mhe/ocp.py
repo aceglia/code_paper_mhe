@@ -27,57 +27,17 @@ from bioptim import (
     Solution,
     DynamicsFunctions,
     DynamicsEvaluation,
+    BiorbdModel,
 )
 
 
-def muscle_forces(
-    q: np.ndarray,
-    qdot: np.ndarray,
-    act: np.ndarray,
-    controls: np.ndarray,
-    model: biorbd.Model,
-    use_excitation: bool = False,
-):
-    """
-    Compute the muscle force for a given state and controls.
-
-    Parameters
-    ----------
-    q : np.ndarray
-        State of the model.
-    qdot : np.ndarray
-        State of the model.
-    act : np.ndarray
-        Activation of the muscles.
-    controls : np.ndarray
-        Controls of the model.
-    model : biorbd.Model
-        Model of the system.
-    use_excitation : bool
-        If True, use the excitation of the muscles.
-
-    Returns
-    -------
-    Muscle force.
-    """
-    muscles_states = model.stateSet()
-    for k in range(model.nbMuscles()):
-        if use_excitation is not True:
-            muscles_states[k].setActivation(controls[k])
-        else:
-            muscles_states[k].setExcitation(controls[k])
-            muscles_states[k].setActivation(act[k])
-    muscles_force = model.muscleForces(muscles_states, q, qdot).to_mx()
-    return muscles_force
-
-
-def force_func(biorbd_model: biorbd.Model, use_excitation: bool = False):
+def force_func(biorbd_model: BiorbdModel):
     """
     Define the casadi function that compute the muscle force.
 
     Parameters
     ----------
-    biorbd_model : biorbd.Model
+    biorbd_model : BiorbdModel
         Model of the system.
     use_excitation : bool
         If True, use the excitation of the muscles.
@@ -86,15 +46,14 @@ def force_func(biorbd_model: biorbd.Model, use_excitation: bool = False):
     -------
     Casadi function that compute the muscle force.
     """
-    qMX = MX.sym("qMX", biorbd_model.nbQ(), 1)
-    dqMX = MX.sym("dqMX", biorbd_model.nbQ(), 1)
-    aMX = MX.sym("aMX", biorbd_model.nbMuscles(), 1)
-    uMX = MX.sym("uMX", biorbd_model.nbMuscles(), 1)
+    qMX = MX.sym("qMX", biorbd_model.nb_q, 1)
+    dqMX = MX.sym("dqMX", biorbd_model.nb_q, 1)
+    aMX = MX.sym("aMX", biorbd_model.nb_muscles, 1)
     return Function(
         "MuscleForce",
-        [qMX, dqMX, aMX, uMX],
-        [muscle_forces(qMX, dqMX, aMX, uMX, biorbd_model, use_excitation=use_excitation)],
-        ["qMX", "dqMX", "aMX", "uMX"],
+        [qMX, dqMX, aMX],
+        [biorbd_model.muscle_forces(qMX, dqMX, aMX)],
+        ["qMX", "dqMX", "aMX"],
         ["Force"],
     ).expand()
 
@@ -105,7 +64,7 @@ def define_objective(
     track_emg: bool,
     muscles_target: np.ndarray,
     kin_target: np.ndarray,
-    biorbd_model: biorbd.Model,
+    biorbd_model: BiorbdModel,
     previous_sol: np.ndarray,
     kin_data_to_track: str = "markers",
     muscle_track_idx: list = (),
@@ -127,7 +86,7 @@ def define_objective(
         Target for kinematics objective.
     previous_sol : np.ndarray
         solution of the previous subproblem
-    biorbd_model : biorbd.Model
+    biorbd_model : BiorbdModel
         Model of the system.
     kin_data_to_track : str
         Kind of kinematics data to track ("markers" or "q").
@@ -139,11 +98,11 @@ def define_objective(
     Objective function.
     """
     previous_q, previous_qdot = (
-        previous_sol[: biorbd_model.nbQ(), :],
-        previous_sol[biorbd_model.nbQ() : biorbd_model.nbQ() * 2, :],
+        previous_sol[: biorbd_model.nb_q, :],
+        previous_sol[biorbd_model.nb_q : biorbd_model.nb_q * 2, :],
     )
     muscle_min_idx = []
-    for i in range(biorbd_model.nbMuscles()):
+    for i in range(biorbd_model.nb_muscles):
         if i not in muscle_track_idx:
             muscle_min_idx.append(i)
 
@@ -192,7 +151,7 @@ def define_objective(
     objectives.add(
         ObjectiveFcn.Lagrange.MINIMIZE_STATE,
         weight=weights["min_dq"],
-        index=np.array(range(biorbd_model.nbQ())),
+        index=np.array(range(biorbd_model.nb_q)),
         key="qdot",
         node=Node.ALL,
         multi_thread=False,
@@ -201,7 +160,7 @@ def define_objective(
     objectives.add(
         ObjectiveFcn.Lagrange.MINIMIZE_STATE,
         weight=weights["min_dq"],
-        index=np.array(range(biorbd_model.nbQ())),
+        index=np.array(range(biorbd_model.nb_q)),
         key="qdot",
         node=Node.ALL,
         multi_thread=False,
@@ -256,8 +215,8 @@ def custom_muscles_driven(
     mus_activations = DynamicsFunctions.get(mus_act_nlp["muscles"], mus_act)
     muscles_tau = DynamicsFunctions.compute_tau_from_muscle(nlp, q, qdot, mus_activations)
 
-    for i in range(nlp.model.nbQ()):
-        if i > 4 and i != nlp.model.nbQ() - 1:
+    for i in range(nlp.model.nb_q):
+        if i > 4 and i != nlp.model.nb_q - 1:
             residual_tau[i] = MX(0)
 
     tau = muscles_tau + residual_tau if residual_tau is not None else muscles_tau
@@ -312,8 +271,8 @@ def prepare_problem(
     -------
     The problem and the solver.
     """
-    biorbd_model = biorbd.Model(model_path)
-    nbGT = biorbd_model.nbGeneralizedTorque() if use_torque else 0
+    biorbd_model = BiorbdModel(model_path)
+    nbGT = biorbd_model.nb_tau if use_torque else 0
     tau_min, tau_max, tau_init = -30, 30, 0
     muscle_min, muscle_max, muscle_init = 0, 1, 0.1
 
@@ -327,33 +286,34 @@ def prepare_problem(
         with_torque=use_torque,
         expand=False,
     )
-    if x0.shape[0] != biorbd_model.nbQ() * 2:
+    if x0.shape[0] != biorbd_model.nb_q * 2:
         x_0 = np.concatenate((x0[:, : window_len + 1], np.zeros((x0.shape[0], window_len + 1))))
     else:
         x_0 = x0[:, : window_len + 1]
 
     # State path constraint
     x_bounds = BoundsList()
-    x_bounds.add(bounds=QAndQDotBounds(biorbd_model))
-    x_bounds[0].min[: biorbd_model.nbQ(), 0] = [i - 0.1 * i for i in x_0[: biorbd_model.nbQ(), 0]]
-    x_bounds[0].max[: biorbd_model.nbQ(), 0] = [i + 0.1 * i for i in x_0[: biorbd_model.nbQ(), 0]]
-    x_bounds[0].min[biorbd_model.nbQ() : biorbd_model.nbQ() * 2, 0] = [
-        i - 0.1 * i for i in x_0[biorbd_model.nbQ() :, 0]
+    x_bounds.add(bounds=biorbd_model.bounds_from_ranges(["q", "qdot"]))
+    x_bounds[0].min[: biorbd_model.nb_q, 0] = [i - 0.1 * i for i in x_0[: biorbd_model.nb_q, 0]]
+    x_bounds[0].max[: biorbd_model.nb_q, 0] = [i + 0.1 * i for i in x_0[: biorbd_model.nb_q, 0]]
+    x_bounds[0].min[biorbd_model.nb_q : biorbd_model.nb_q * 2, 0] = [
+        i - 0.1 * i for i in x_0[biorbd_model.nb_q :, 0]
     ]
-    x_bounds[0].max[biorbd_model.nbQ() : biorbd_model.nbQ() * 2, 0] = [
-        i + 0.1 * i for i in x_0[biorbd_model.nbQ() :, 0]
+    x_bounds[0].max[biorbd_model.nb_q : biorbd_model.nb_q * 2, 0] = [
+        i + 0.1 * i for i in x_0[biorbd_model.nb_q :, 0]
     ]
-    x_bounds[0].min[biorbd_model.nbQ() : biorbd_model.nbQ() * 2, [1, -1]] = [[-5] * 2] * biorbd_model.nbQ()
-    x_bounds[0].max[biorbd_model.nbQ() : biorbd_model.nbQ() * 2, [1, -1]] = [[5] * 2] * biorbd_model.nbQ()
+    x_bounds[0].min[biorbd_model.nb_q : biorbd_model.nb_q * 2, [1, -1]] = [[-5] * 2] * biorbd_model.nb_q
+    x_bounds[0].max[biorbd_model.nb_q : biorbd_model.nb_q * 2, [1, -1]] = [[5] * 2] * biorbd_model.nb_q
 
     u_bounds = Bounds(
-        [tau_min] * nbGT + [muscle_min] * biorbd_model.nbMuscleTotal(),
-        [tau_max] * nbGT + [muscle_max] * biorbd_model.nbMuscleTotal(),
+        [tau_min] * nbGT + [muscle_min] * biorbd_model.nb_muscles,
+        [tau_max] * nbGT + [muscle_max] * biorbd_model.nb_muscles,
         interpolation=InterpolationType.CONSTANT_WITH_FIRST_AND_LAST_DIFFERENT,
     )
 
     # Initial guesses
-    if x0.shape[0] != biorbd_model.nbQ() * 2:
+
+    if x0.shape[0] != biorbd_model.nb_q * 2:
         x0 = np.concatenate((x0[:, : window_len + 1], np.zeros((x0.shape[0], window_len + 1))))
     else:
         x0 = x0[:, : window_len + 1]
@@ -361,13 +321,13 @@ def prepare_problem(
     x_init = InitialGuess(x0, interpolation=InterpolationType.EACH_FRAME)
 
     if u0 is None:
-        u0 = np.array([tau_init] * nbGT + [muscle_init] * biorbd_model.nbMuscles())
+        u0 = np.array([tau_init] * nbGT + [muscle_init] * biorbd_model.nb_muscles)
         u_init = InitialGuess(np.tile(u0, (window_len, 1)).T, interpolation=InterpolationType.EACH_FRAME)
     else:
         u_init = InitialGuess(u0[:, :window_len], interpolation=InterpolationType.EACH_FRAME)
 
     problem = CustomMhe(
-        biorbd_model=biorbd_model,
+        bio_model=biorbd_model,
         dynamics=dynamics,
         window_len=window_len,
         window_duration=window_duration,
@@ -435,7 +395,7 @@ def get_target(
     slide_size: int,
     track_emg: bool,
     kin_data_to_track: str,
-    model: biorbd.Model,
+    model: BiorbdModel,
     offline: bool,
     sol,
 ):
@@ -471,7 +431,7 @@ def get_target(
     -------
     Dictionary of targets (values and objective functions index)
     """
-    nbMT, nbQ = model.nbMuscles(), model.nbQ()
+    nbMT, nbQ = model.nb_muscles, model.nb_q
     muscles_ref = muscles_ref if track_emg is True else np.zeros((nbMT, ns_mhe))
     q_target_idx, markers_target_idx, muscles_target_idx = [], [], []
 
@@ -864,7 +824,7 @@ class CustomMhe(MovingHorizonEstimator):
         _controls = InitialGuess(np.concatenate(controls, axis=1), interpolation=InterpolationType.EACH_FRAME)
 
         solution_ocp = OptimalControlProgram(
-            bio_model=self.original_values["biorbd_model"][0],
+            bio_model=self.original_values["bio_model"][0],
             dynamics=self.original_values["dynamics"][0],
             n_shooting=(self.total_optimization_run * 1) - 1,
             phase_time=self.total_optimization_run * self.nlp[0].dt,
